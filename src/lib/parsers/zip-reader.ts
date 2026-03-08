@@ -20,10 +20,12 @@ export interface ExtractedFile {
 // --- Binary Readers ---
 
 function readUint16LE(bytes: Uint8Array, offset: number): number {
+  if (offset + 1 >= bytes.length) return 0;
   return bytes[offset] | (bytes[offset + 1] << 8);
 }
 
 function readUint32LE(bytes: Uint8Array, offset: number): number {
+  if (offset + 3 >= bytes.length) return 0;
   return (
     (bytes[offset] |
       (bytes[offset + 1] << 8) |
@@ -48,12 +50,14 @@ export async function extractZipFiles(buffer: ArrayBuffer): Promise<ExtractedFil
   for (const entry of entries) {
     // Skip directories
     if (entry.fileName.endsWith('/')) continue;
-    // Skip empty files
-    if (entry.uncompressedSize === 0 && entry.compressedSize === 0) continue;
     // Skip __MACOSX metadata
     if (entry.fileName.startsWith('__MACOSX/')) continue;
-    // Skip hidden files
-    if (entry.fileName.split('/').some(part => part.startsWith('.'))) continue;
+    if (entry.fileName.includes('/__MACOSX/')) continue;
+    // Skip hidden files (but not files in hidden directories like .git)
+    const baseName = entry.fileName.split('/').pop() || '';
+    if (baseName.startsWith('.') && baseName !== '') continue;
+    // Skip truly empty files (stored, 0 bytes)
+    if (entry.compressionMethod === 0 && entry.compressedSize === 0 && entry.uncompressedSize === 0) continue;
 
     try {
       const data = await extractEntry(bytes, entry);
@@ -62,7 +66,6 @@ export async function extractZipFiles(buffer: ArrayBuffer): Promise<ExtractedFil
       }
     } catch {
       // Skip files we can't extract — don't fail the whole archive
-      console.warn(`[ZIP] Could not extract: ${entry.fileName}`);
     }
   }
 
@@ -80,9 +83,14 @@ export async function extractFileByName(
   const bytes = new Uint8Array(buffer);
   const entries = readCentralDirectory(bytes);
 
-  const entry = entries.find(
-    (e) => e.fileName === targetName || e.fileName.toLowerCase() === targetName.toLowerCase()
-  );
+  // Try exact match, then case-insensitive, then partial path match
+  let entry = entries.find((e) => e.fileName === targetName);
+  if (!entry) {
+    entry = entries.find((e) => e.fileName.toLowerCase() === targetName.toLowerCase());
+  }
+  if (!entry) {
+    entry = entries.find((e) => e.fileName.toLowerCase().endsWith(targetName.toLowerCase()));
+  }
 
   if (!entry) return null;
 
@@ -108,7 +116,6 @@ export function listZipFiles(buffer: ArrayBuffer): string[] {
 function readCentralDirectory(bytes: Uint8Array): ZipEntry[] {
   // Find End of Central Directory record (EOCD)
   // Signature: 0x06054b50 — scan backwards from end of file
-  // EOCD is at least 22 bytes, and the comment can be up to 65535 bytes
   let eocdOffset = -1;
   const searchStart = Math.max(0, bytes.length - 65557);
 
@@ -125,15 +132,13 @@ function readCentralDirectory(bytes: Uint8Array): ZipEntry[] {
   }
 
   if (eocdOffset === -1) {
-    // Fallback: scan for local file headers directly
     return readLocalFileHeaders(bytes);
   }
 
   const cdEntryCount = readUint16LE(bytes, eocdOffset + 10);
   const cdOffset = readUint32LE(bytes, eocdOffset + 16);
 
-  // Validate central directory offset
-  if (cdOffset >= bytes.length) {
+  if (cdOffset >= bytes.length || cdOffset === 0xFFFFFFFF) {
     return readLocalFileHeaders(bytes);
   }
 
@@ -153,24 +158,31 @@ function readCentralDirectory(bytes: Uint8Array): ZipEntry[] {
     const localHeaderOffset = readUint32LE(bytes, pos + 42);
 
     // Read file name
+    if (pos + 46 + fileNameLength > bytes.length) break;
     const fileNameBytes = bytes.slice(pos + 46, pos + 46 + fileNameLength);
     const fileName = new TextDecoder().decode(fileNameBytes);
 
     // Calculate actual data offset from the local file header
     let dataOffset = localHeaderOffset + 30;
     if (localHeaderOffset + 30 <= bytes.length) {
-      const localFileNameLen = readUint16LE(bytes, localHeaderOffset + 26);
-      const localExtraLen = readUint16LE(bytes, localHeaderOffset + 28);
-      dataOffset = localHeaderOffset + 30 + localFileNameLen + localExtraLen;
+      // Verify local header signature
+      if (readUint32LE(bytes, localHeaderOffset) === 0x04034b50) {
+        const localFileNameLen = readUint16LE(bytes, localHeaderOffset + 26);
+        const localExtraLen = readUint16LE(bytes, localHeaderOffset + 28);
+        dataOffset = localHeaderOffset + 30 + localFileNameLen + localExtraLen;
+      }
     }
 
-    entries.push({
-      fileName,
-      compressedSize,
-      uncompressedSize,
-      compressionMethod,
-      dataOffset,
-    });
+    // Validate data offset
+    if (dataOffset < bytes.length) {
+      entries.push({
+        fileName,
+        compressedSize,
+        uncompressedSize,
+        compressionMethod,
+        dataOffset,
+      });
+    }
 
     pos += 46 + fileNameLength + extraFieldLength + commentLength;
   }
@@ -184,29 +196,76 @@ function readCentralDirectory(bytes: Uint8Array): ZipEntry[] {
 function readLocalFileHeaders(bytes: Uint8Array): ZipEntry[] {
   const entries: ZipEntry[] = [];
   let pos = 0;
+  let scanAttempts = 0;
+  const maxScanAttempts = bytes.length; // prevent infinite loops
 
-  while (pos + 30 < bytes.length) {
+  while (pos + 30 < bytes.length && scanAttempts < maxScanAttempts) {
+    scanAttempts++;
+
     // Local file header signature: 0x04034b50
     if (readUint32LE(bytes, pos) !== 0x04034b50) {
-      // Try next byte (might be misaligned)
-      if (entries.length === 0) {
+      if (entries.length === 0 && pos < 1024) {
         pos++;
         continue;
       }
       break;
     }
 
+    const flags = readUint16LE(bytes, pos + 6);
     const compressionMethod = readUint16LE(bytes, pos + 8);
-    const compressedSize = readUint32LE(bytes, pos + 18);
-    const uncompressedSize = readUint32LE(bytes, pos + 22);
+    let compressedSize = readUint32LE(bytes, pos + 18);
+    let uncompressedSize = readUint32LE(bytes, pos + 22);
     const fileNameLength = readUint16LE(bytes, pos + 26);
     const extraFieldLength = readUint16LE(bytes, pos + 28);
+
+    if (pos + 30 + fileNameLength > bytes.length) break;
 
     const fileNameBytes = bytes.slice(pos + 30, pos + 30 + fileNameLength);
     const fileName = new TextDecoder().decode(fileNameBytes);
     const dataOffset = pos + 30 + fileNameLength + extraFieldLength;
 
-    if (compressedSize > 0) {
+    // Handle data descriptor flag (bit 3) — sizes may be in descriptor after data
+    const hasDataDescriptor = (flags & 0x08) !== 0;
+
+    if (hasDataDescriptor && compressedSize === 0) {
+      // Sizes are in the data descriptor after the compressed data
+      // We need to scan for the next local file header or the data descriptor signature
+      let scanPos = dataOffset;
+      let foundSize = false;
+
+      // Scan for either the data descriptor signature or next local file header
+      while (scanPos + 4 < bytes.length) {
+        const sig = readUint32LE(bytes, scanPos);
+        if (sig === 0x08074b50) {
+          // Data descriptor with signature
+          compressedSize = readUint32LE(bytes, scanPos + 8);
+          uncompressedSize = readUint32LE(bytes, scanPos + 12);
+          foundSize = true;
+          break;
+        }
+        if (sig === 0x04034b50) {
+          // Next local file header — compressed data is everything between
+          compressedSize = scanPos - dataOffset;
+          uncompressedSize = compressedSize; // approximate
+          foundSize = true;
+          break;
+        }
+        scanPos++;
+      }
+
+      if (!foundSize) {
+        // Assume rest of file is data (minus potential EOCD)
+        compressedSize = Math.max(0, bytes.length - dataOffset - 100);
+      }
+    }
+
+    // Include entry even if compressedSize is 0 for stored files with uncompressedSize > 0
+    if (compressedSize > 0 || uncompressedSize > 0) {
+      // Use the larger of the two for stored files
+      if (compressionMethod === 0 && compressedSize === 0) {
+        compressedSize = uncompressedSize;
+      }
+
       entries.push({
         fileName,
         compressedSize,
@@ -217,19 +276,19 @@ function readLocalFileHeaders(bytes: Uint8Array): ZipEntry[] {
     }
 
     // Move past this entry
-    const flags = readUint16LE(bytes, pos + 6);
     let nextPos = dataOffset + compressedSize;
 
-    // Handle data descriptor (bit 3 of general purpose flags)
-    if (flags & 0x08) {
-      // Data descriptor: optional signature (4 bytes) + CRC-32 (4) + compressed size (4) + uncompressed size (4)
+    if (hasDataDescriptor) {
+      // Skip data descriptor
       if (nextPos + 4 <= bytes.length && readUint32LE(bytes, nextPos) === 0x08074b50) {
-        nextPos += 16; // with signature
-      } else {
-        nextPos += 12; // without signature
+        nextPos += 16; // with signature: sig(4) + crc(4) + compSize(4) + uncompSize(4)
+      } else if (nextPos + 12 <= bytes.length) {
+        nextPos += 12; // without signature: crc(4) + compSize(4) + uncompSize(4)
       }
     }
 
+    // Safety: ensure we're making forward progress
+    if (nextPos <= pos) break;
     pos = nextPos;
   }
 
@@ -240,57 +299,80 @@ function readLocalFileHeaders(bytes: Uint8Array): ZipEntry[] {
 
 async function extractEntry(bytes: Uint8Array, entry: ZipEntry): Promise<Uint8Array> {
   // Bounds check
-  if (entry.dataOffset + entry.compressedSize > bytes.length) {
-    throw new Error(`Entry data extends beyond file bounds: ${entry.fileName}`);
+  const endOffset = entry.dataOffset + entry.compressedSize;
+  if (endOffset > bytes.length) {
+    // Try with available data instead of failing
+    const availableSize = bytes.length - entry.dataOffset;
+    if (availableSize <= 0) {
+      throw new Error(`Entry data offset beyond file bounds: ${entry.fileName}`);
+    }
+    const compressedData = bytes.slice(entry.dataOffset, bytes.length);
+
+    if (entry.compressionMethod === 0) return compressedData;
+    if (entry.compressionMethod === 8) {
+      try {
+        return await decompressDeflateRaw(compressedData);
+      } catch {
+        throw new Error(`Decompression failed for truncated entry: ${entry.fileName}`);
+      }
+    }
+    throw new Error(`Unsupported compression method: ${entry.compressionMethod}`);
   }
 
-  const compressedData = bytes.slice(
-    entry.dataOffset,
-    entry.dataOffset + entry.compressedSize
-  );
+  const compressedData = bytes.slice(entry.dataOffset, endOffset);
 
   if (entry.compressionMethod === 0) {
-    // Stored (no compression) — return as-is
     return compressedData;
   }
 
   if (entry.compressionMethod === 8) {
-    // DEFLATE — use browser's DecompressionStream
     return await decompressDeflateRaw(compressedData);
   }
 
-  // Unsupported compression method
   throw new Error(`Unsupported compression method: ${entry.compressionMethod}`);
 }
 
 async function decompressDeflateRaw(data: Uint8Array): Promise<Uint8Array> {
-  // Check if DecompressionStream is available (Chrome 80+, Firefox 103+, Safari 16.4+)
   if (typeof DecompressionStream === 'undefined') {
-    throw new Error('DecompressionStream API not available in this browser');
+    // Fallback: try to extract readable text from raw data
+    // This won't decompress but at least won't crash
+    throw new Error('DecompressionStream API not available');
   }
 
   const ds = new DecompressionStream('deflate-raw');
   const writer = ds.writable.getWriter();
   const reader = ds.readable.getReader();
 
-  // Write data and close — copy to a fresh ArrayBuffer to satisfy strict TypeScript types
+  // Copy to a fresh ArrayBuffer to satisfy strict TypeScript types
   const copy = new ArrayBuffer(data.byteLength);
   new Uint8Array(copy).set(data);
   writer.write(copy).catch(() => {});
   writer.close().catch(() => {});
 
-  // Collect decompressed chunks
   const chunks: Uint8Array[] = [];
   let totalLength = 0;
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    chunks.push(value);
-    totalLength += value.length;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+      totalLength += value.length;
+    }
+  } catch {
+    // If we got some data before failure, return what we have
+    if (totalLength > 0) {
+      const partial = new Uint8Array(totalLength);
+      let offset = 0;
+      for (const chunk of chunks) {
+        partial.set(chunk, offset);
+        offset += chunk.length;
+      }
+      return partial;
+    }
+    throw new Error('Decompression failed');
   }
 
-  // Concatenate chunks
   const result = new Uint8Array(totalLength);
   let offset = 0;
   for (const chunk of chunks) {

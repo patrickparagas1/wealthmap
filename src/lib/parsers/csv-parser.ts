@@ -38,26 +38,41 @@ export function parseCSV(file: File): Promise<CSVParseResult> {
   });
 }
 
-// Common bank CSV column name mappings
+// Common bank CSV column name mappings (expanded for real-world exports)
 const COLUMN_ALIASES: Record<string, string[]> = {
-  date: ['date', 'transaction date', 'post date', 'posting date', 'trans date', 'effective date'],
-  description: ['description', 'memo', 'narrative', 'details', 'transaction', 'payee', 'name'],
-  amount: ['amount', 'transaction amount', 'debit/credit', 'net amount'],
-  debit: ['debit', 'withdrawal', 'withdrawals', 'debit amount', 'money out'],
-  credit: ['credit', 'deposit', 'deposits', 'credit amount', 'money in'],
-  balance: ['balance', 'running balance', 'available balance', 'current balance', 'ending balance'],
-  category: ['category', 'type', 'transaction type', 'trans type'],
+  date: ['date', 'transaction date', 'post date', 'posting date', 'trans date', 'effective date', 'value date', 'trade date', 'settlement date', 'booked date', 'completed date'],
+  description: ['description', 'memo', 'narrative', 'details', 'transaction', 'payee', 'name', 'merchant', 'merchant name', 'reference', 'remarks', 'particulars', 'transaction description', 'original description'],
+  amount: ['amount', 'transaction amount', 'debit/credit', 'net amount', 'sum', 'value', 'transaction value', 'payment amount'],
+  debit: ['debit', 'withdrawal', 'withdrawals', 'debit amount', 'money out', 'outflow', 'expense', 'charges', 'outgoing'],
+  credit: ['credit', 'deposit', 'deposits', 'credit amount', 'money in', 'inflow', 'income', 'incoming'],
+  balance: ['balance', 'running balance', 'available balance', 'current balance', 'ending balance', 'account balance', 'closing balance', 'ledger balance'],
+  category: ['category', 'type', 'transaction type', 'trans type', 'classification', 'movement type', 'entry type'],
 };
 
 /**
  * Map CSV headers to standardized field names using common bank aliases.
+ * Uses both exact match and substring/contains matching for flexibility.
  */
 export function mapCSVHeaders(headers: string[]): Record<string, string> {
   const mapping: Record<string, string> = {};
   const lowerHeaders = headers.map((h) => h.toLowerCase().trim());
 
   for (const [standard, aliases] of Object.entries(COLUMN_ALIASES)) {
-    const matchIndex = lowerHeaders.findIndex((h) => aliases.includes(h));
+    // Try exact match first
+    let matchIndex = lowerHeaders.findIndex((h) => aliases.includes(h));
+
+    // Fallback: try substring/contains matching
+    if (matchIndex === -1) {
+      matchIndex = lowerHeaders.findIndex((h) =>
+        aliases.some((alias) => h.includes(alias) || alias.includes(h))
+      );
+    }
+
+    // Last resort: try keyword matching (e.g., header "trans_date" matches keyword "date")
+    if (matchIndex === -1 && ['date', 'amount', 'balance'].includes(standard)) {
+      matchIndex = lowerHeaders.findIndex((h) => h.includes(standard));
+    }
+
     if (matchIndex !== -1) {
       mapping[standard] = headers[matchIndex];
     }
