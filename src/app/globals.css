@@ -1,8 +1,40 @@
 @import "tailwindcss";
 
+/* ================================================================
+   WealthMap Design System — Apple/Tesla/Google Inspired
+   Bright, clean, premium aesthetic with vibrant accents
+   ================================================================ */
+
 :root {
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #1d1d1f;
+  --surface: #f5f5f7;
+  --surface-elevated: #ffffff;
+  --border: #d2d2d7;
+  --border-light: #e8e8ed;
+  --text-primary: #1d1d1f;
+  --text-secondary: #6e6e73;
+  --text-tertiary: #86868b;
+  --accent-blue: #0071e3;
+  --accent-blue-hover: #0077ed;
+  --accent-green: #34c759;
+  --accent-purple: #af52de;
+  --accent-orange: #ff9500;
+  --accent-red: #ff3b30;
+  --accent-teal: #5ac8fa;
+}
+
+/* Dashboard pages keep dark theme */
+.theme-dark {
+  --background: #0f172a;
+  --foreground: #f1f5f9;
+  --surface: rgba(15, 23, 42, 0.5);
+  --surface-elevated: rgba(30, 41, 59, 0.4);
+  --border: rgba(51, 65, 85, 0.6);
+  --border-light: rgba(51, 65, 85, 0.3);
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-tertiary: #64748b;
 }
 
 @theme inline {
@@ -12,15 +44,358 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ================================================================
+   Scrollbar — Minimal
+   ================================================================ */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 3px;
+}
+
+.theme-dark ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+/* ================================================================
+   Smooth transitions — selective, not universal
+   ================================================================ */
+a, button, input, select, textarea, .transition-all {
+  transition-property: background-color, border-color, color, opacity, transform, box-shadow;
+  transition-duration: 200ms;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ================================================================
+   Number input spinners — remove
+   ================================================================ */
+input[type='number']::-webkit-inner-spin-button,
+input[type='number']::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type='number'] {
+  -moz-appearance: textfield;
+}
+
+/* ================================================================
+   Glass effects — light and dark variants
+   ================================================================ */
+.glass {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+}
+
+.theme-dark .glass {
+  background: rgba(30, 41, 59, 0.72);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+}
+
+/* ================================================================
+   Gradient text — vibrant blue-to-purple
+   ================================================================ */
+.gradient-text {
+  background: linear-gradient(135deg, #0071e3, #af52de);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.gradient-text-green {
+  background: linear-gradient(135deg, #34c759, #30d158);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ================================================================
+   Premium card styles
+   ================================================================ */
+.card-premium {
+  background: #ffffff;
+  border: 1px solid var(--border-light);
+  border-radius: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 4px 12px rgba(0, 0, 0, 0.03);
+}
+
+.card-premium:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06), 0 8px 24px rgba(0, 0, 0, 0.06);
+  transform: translateY(-2px);
+}
+
+/* Dark theme card surfaces */
+.card-surface {
+  background: rgba(15, 23, 42, 0.5);
+  border: 1px solid rgba(51, 65, 85, 0.6);
+}
+
+.card-surface-elevated {
+  background: rgba(30, 41, 59, 0.4);
+  border: 1px solid rgba(51, 65, 85, 0.8);
+}
+
+/* ================================================================
+   Premium button styles
+   ================================================================ */
+.btn-primary {
+  background: var(--accent-blue);
+  color: #ffffff;
+  border-radius: 980px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  padding: 12px 28px;
+  border: none;
+  cursor: pointer;
+  font-size: 17px;
+  line-height: 1.17648;
+}
+
+.btn-primary:hover {
+  background: var(--accent-blue-hover);
+}
+
+.btn-secondary {
+  background: transparent;
+  color: var(--accent-blue);
+  border-radius: 980px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  padding: 12px 28px;
+  border: none;
+  cursor: pointer;
+  font-size: 17px;
+  line-height: 1.17648;
+}
+
+.btn-secondary:hover {
+  text-decoration: underline;
+}
+
+/* ================================================================
+   Animations
+   ================================================================ */
+@keyframes pulse-ring {
+  0% { transform: scale(0.95); opacity: 0.5; }
+  50% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(0.95); opacity: 0.5; }
+}
+
+.pulse-ring {
+  animation: pulse-ring 2s ease-in-out infinite;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.fade-in { animation: fadeIn 0.6s cubic-bezier(0.4, 0, 0.2, 1); }
+.fade-in-delay-1 { animation: fadeIn 0.6s cubic-bezier(0.4, 0, 0.2, 1) 0.1s both; }
+.fade-in-delay-2 { animation: fadeIn 0.6s cubic-bezier(0.4, 0, 0.2, 1) 0.2s both; }
+.fade-in-delay-3 { animation: fadeIn 0.6s cubic-bezier(0.4, 0, 0.2, 1) 0.3s both; }
+
+@keyframes float {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-20px) scale(1.02); }
+}
+
+@keyframes float-delayed {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-15px) scale(0.98); }
+}
+
+.float-slow { animation: float 8s ease-in-out infinite; }
+.float-delayed { animation: float-delayed 10s ease-in-out infinite 2s; }
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.shimmer {
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent);
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+@keyframes countUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.count-up {
+  animation: countUp 0.8s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+/* ================================================================
+   Financial figures — tabular-nums for aligned displays
+   ================================================================ */
+.financial-figure {
+  font-variant-numeric: tabular-nums;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  letter-spacing: -0.02em;
+}
+
+/* ================================================================
+   Dot grid background — subtle
+   ================================================================ */
+.dot-grid {
+  background-image: radial-gradient(circle, rgba(0, 0, 0, 0.04) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.theme-dark .dot-grid,
+.theme-dark.dot-grid {
+  background-image: radial-gradient(circle, rgba(148, 163, 184, 0.06) 1px, transparent 1px);
+}
+
+/* ================================================================
+   Focus styles
+   ================================================================ */
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--accent-blue) !important;
+  box-shadow: 0 0 0 4px rgba(0, 113, 227, 0.15);
+}
+
+input::placeholder, textarea::placeholder {
+  opacity: 0.5;
+  color: var(--text-tertiary);
+}
+
+/* ================================================================
+   Colored left borders for planning area cards (dashboard)
+   ================================================================ */
+.border-l-blue { border-left: 3px solid #0071e3; }
+.border-l-emerald { border-left: 3px solid #34c759; }
+.border-l-violet { border-left: 3px solid #af52de; }
+.border-l-amber { border-left: 3px solid #ff9500; }
+.border-l-rose { border-left: 3px solid #ff3b30; }
+.border-l-cyan { border-left: 3px solid #5ac8fa; }
+.border-l-gold { border-left: 3px solid #d4a853; }
+
+/* ================================================================
+   Chart tooltip — dark theme (dashboard only)
+   ================================================================ */
+.recharts-tooltip-wrapper {
+  outline: none !important;
+}
+
+.recharts-default-tooltip {
+  background-color: #1e293b !important;
+  border: 1px solid #334155 !important;
+  border-radius: 12px !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3) !important;
+}
+
+.recharts-tooltip-label {
+  color: #f1f5f9 !important;
+}
+
+.recharts-tooltip-item {
+  color: #94a3b8 !important;
+}
+
+/* ================================================================
+   Section backgrounds for landing page
+   ================================================================ */
+.section-alt {
+  background: var(--surface);
+}
+
+/* ================================================================
+   Premium gradient backgrounds
+   ================================================================ */
+.bg-hero-gradient {
+  background: linear-gradient(180deg, #f5f5f7 0%, #ffffff 50%, #f5f5f7 100%);
+}
+
+.bg-gradient-radial-blue {
+  background: radial-gradient(ellipse at 50% 0%, rgba(0, 113, 227, 0.08) 0%, transparent 60%);
+}
+
+.bg-gradient-radial-purple {
+  background: radial-gradient(ellipse at 50% 100%, rgba(175, 82, 222, 0.06) 0%, transparent 60%);
+}
+
+/* ================================================================
+   Interactive calculator styles
+   ================================================================ */
+.calculator-input {
+  background: var(--surface);
+  border: 1px solid var(--border-light);
+  border-radius: 12px;
+  padding: 14px 16px;
+  font-size: 16px;
+  color: var(--text-primary);
+  width: 100%;
+}
+
+.calculator-input:focus {
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 0 4px rgba(0, 113, 227, 0.12);
+}
+
+/* ================================================================
+   Score ring animation
+   ================================================================ */
+@keyframes drawRing {
+  from { stroke-dashoffset: 283; }
+}
+
+.score-ring {
+  animation: drawRing 1.5s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+/* ================================================================
+   FAQ accordion
+   ================================================================ */
+.faq-answer {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1), padding 0.3s;
+}
+
+.faq-answer.open {
+  max-height: 200px;
+  padding-top: 12px;
+}
+
+/* Gradient border */
+.gradient-border {
+  position: relative;
+  border: 1px solid transparent;
+  background-clip: padding-box;
+}
+
+.gradient-border::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  background: linear-gradient(135deg, rgba(0, 113, 227, 0.3), rgba(175, 82, 222, 0.3));
+  z-index: -1;
 }
