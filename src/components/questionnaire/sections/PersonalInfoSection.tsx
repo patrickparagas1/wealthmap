@@ -58,8 +58,8 @@ export default function PersonalInfoSection() {
       </div>
 
       {personalInfo.hasSpouse && (
-        <div className="p-5 rounded-xl bg-slate-800/30 border border-slate-700/50 space-y-4">
-          <h3 className="text-sm font-semibold text-white">Spouse Information</h3>
+        <div className="p-5 rounded-2xl bg-white border border-[#e8e8ed] shadow-sm space-y-4">
+          <h3 className="text-sm font-semibold text-[#1d1d1f]">Spouse Information</h3>
           <div className="grid md:grid-cols-2 gap-4">
             <FormField label="First Name" value={personalInfo.spouse?.firstName || ''} onChange={v => updatePersonalInfo({ spouse: { ...(personalInfo.spouse || spouseDefault), firstName: v } })} />
             <FormField label="Last Name" value={personalInfo.spouse?.lastName || ''} onChange={v => updatePersonalInfo({ spouse: { ...(personalInfo.spouse || spouseDefault), lastName: v } })} />
@@ -80,14 +80,14 @@ export default function PersonalInfoSection() {
 
       <div>
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-semibold text-white">Dependents</h3>
-          <button onClick={addDependent} className="flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300"><Plus className="w-3.5 h-3.5" /> Add Dependent</button>
+          <h3 className="text-sm font-semibold text-[#1d1d1f]">Dependents</h3>
+          <button onClick={addDependent} className="flex items-center gap-1.5 text-xs text-[#0071e3] font-medium hover:underline"><Plus className="w-3.5 h-3.5" /> Add Dependent</button>
         </div>
         {(personalInfo.dependents || []).map(dep => (
-          <div key={dep.id} className="p-4 rounded-xl bg-slate-800/30 border border-slate-700/50 mb-3">
+          <div key={dep.id} className="p-4 rounded-2xl bg-white border border-[#e8e8ed] shadow-sm mb-3">
             <div className="flex items-start justify-between mb-3">
-              <span className="text-xs text-slate-400">Dependent</span>
-              <button onClick={() => removeDependent(dep.id)} className="text-red-400 hover:text-red-300"><Trash2 className="w-3.5 h-3.5" /></button>
+              <span className="text-xs text-[#86868b] font-medium">Dependent</span>
+              <button onClick={() => removeDependent(dep.id)} className="text-[#ff3b30] hover:text-[#ff3b30]/80"><Trash2 className="w-3.5 h-3.5" /></button>
             </div>
             <div className="grid md:grid-cols-3 gap-3">
               <FormField label="Name" value={dep.name} onChange={v => updateDependent(dep.id, 'name', v)} />
@@ -97,8 +97,8 @@ export default function PersonalInfoSection() {
               ]} />
             </div>
             {dep.relationship === 'child' && (
-              <div className="mt-3 p-3 rounded-lg bg-slate-800/40 border border-slate-700/30 space-y-3">
-                <div className="text-xs font-medium text-slate-400">Education Savings</div>
+              <div className="mt-3 p-3 rounded-xl bg-[#f5f5f7] border border-[#e8e8ed] space-y-3">
+                <div className="text-xs font-medium text-[#6e6e73]">Education Savings</div>
                 <div className="grid md:grid-cols-2 gap-3">
                   <SelectField label="School Type" value={educationSavings[dep.id]?.schoolType || 'public_in_state'} onChange={v => setEducationSavings({ ...educationSavings, [dep.id]: { ...(educationSavings[dep.id] || { currentSavings: 0, monthlyContribution: 0, accountType: '529' }), schoolType: v } })} options={[
                     { label: 'Public (In-State)', value: 'public_in_state' }, { label: 'Public (Out-of-State)', value: 'public_out_state' },
@@ -117,7 +117,7 @@ export default function PersonalInfoSection() {
             )}
           </div>
         ))}
-        {(personalInfo.dependents || []).length === 0 && <p className="text-sm text-slate-500">No dependents added yet.</p>}
+        {(personalInfo.dependents || []).length === 0 && <p className="text-sm text-[#86868b]">No dependents added yet.</p>}
       </div>
     </div>
   );
@@ -126,8 +126,8 @@ export default function PersonalInfoSection() {
 function FormField({ label, value, onChange, type = 'text', placeholder }: { label: string; value: string; onChange: (v: string) => void; type?: string; placeholder?: string }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <label className="text-sm font-medium text-slate-300">{label}</label>
-      <input type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} className="h-10 bg-slate-800/60 text-white border border-slate-700 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 rounded-xl px-4 outline-none text-sm placeholder:text-slate-500" />
+      <label className="text-sm font-medium text-[#1d1d1f]">{label}</label>
+      <input type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} className="h-10 bg-white text-[#1d1d1f] border border-[#d2d2d7] focus:border-[#0071e3] focus:ring-2 focus:ring-[#0071e3]/15 rounded-xl px-4 outline-none text-sm placeholder:text-[#86868b]" />
     </div>
   );
 }
@@ -135,10 +135,10 @@ function FormField({ label, value, onChange, type = 'text', placeholder }: { lab
 function CurrencyField({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <label className="text-sm font-medium text-slate-300">{label}</label>
+      <label className="text-sm font-medium text-[#1d1d1f]">{label}</label>
       <div className="relative">
-        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
-        <input type="number" value={value || ''} onChange={e => onChange(Number(e.target.value))} className="h-10 w-full bg-slate-800/60 text-white border border-slate-700 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 rounded-xl pl-8 pr-4 outline-none text-sm" />
+        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#86868b] text-sm">$</span>
+        <input type="number" value={value || ''} onChange={e => onChange(Number(e.target.value))} className="h-10 w-full bg-white text-[#1d1d1f] border border-[#d2d2d7] focus:border-[#0071e3] focus:ring-2 focus:ring-[#0071e3]/15 rounded-xl pl-8 pr-4 outline-none text-sm" />
       </div>
     </div>
   );
@@ -147,8 +147,8 @@ function CurrencyField({ label, value, onChange }: { label: string; value: numbe
 function SelectField({ label, value, onChange, options }: { label: string; value: string; onChange: (v: string) => void; options: { label: string; value: string }[] }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <label className="text-sm font-medium text-slate-300">{label}</label>
-      <select value={value} onChange={e => onChange(e.target.value)} className="h-10 bg-slate-800/60 text-white border border-slate-700 focus:border-blue-500 rounded-xl px-4 outline-none text-sm appearance-none cursor-pointer">
+      <label className="text-sm font-medium text-[#1d1d1f]">{label}</label>
+      <select value={value} onChange={e => onChange(e.target.value)} className="h-10 bg-white text-[#1d1d1f] border border-[#d2d2d7] focus:border-[#0071e3] rounded-xl px-4 outline-none text-sm appearance-none cursor-pointer">
         {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
       </select>
     </div>

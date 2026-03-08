@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useCallback, useRef } from 'react';
-import { Upload, FileText, AlertCircle, CheckCircle2, Loader2, Shield } from 'lucide-react';
+import { Upload, FileText, AlertCircle, Loader2, Shield, FileSpreadsheet, FileArchive, FileCode } from 'lucide-react';
 import { processDocument, ProcessingProgress, ParseResult } from '@/lib/parsers';
 
 interface DocumentUploadZoneProps {
@@ -9,7 +9,16 @@ interface DocumentUploadZoneProps {
 }
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-const ACCEPTED_TYPES = ['.pdf', '.csv'];
+const ACCEPTED_EXTENSIONS = ['.pdf', '.csv', '.txt', '.json', '.xlsx', '.xls', '.doc', '.docx', '.zip', '.tsv', '.xlsm'];
+const ACCEPTED_MIME = '.pdf,.csv,.txt,.json,.xlsx,.xls,.doc,.docx,.zip,.tsv,.xlsm';
+
+const FILE_CATEGORIES = [
+  { icon: FileText, label: 'PDF', extensions: '.pdf' },
+  { icon: FileSpreadsheet, label: 'CSV / Excel', extensions: '.csv, .xlsx, .xls' },
+  { icon: FileText, label: 'Word', extensions: '.doc, .docx' },
+  { icon: FileCode, label: 'TXT / JSON', extensions: '.txt, .json' },
+  { icon: FileArchive, label: 'ZIP', extensions: '.zip' },
+];
 
 export default function DocumentUploadZone({ onProcessed }: DocumentUploadZoneProps) {
   const [isDragging, setIsDragging] = useState(false);
@@ -26,14 +35,12 @@ export default function DocumentUploadZone({ onProcessed }: DocumentUploadZonePr
     const queue = Array.from(files);
 
     for (const file of queue) {
-      // Validate file type
       const ext = '.' + file.name.split('.').pop()?.toLowerCase();
-      if (!ACCEPTED_TYPES.includes(ext)) {
-        setError(`Unsupported file type: ${ext}. Please upload PDF or CSV files.`);
+      if (!ACCEPTED_EXTENSIONS.includes(ext)) {
+        setError(`Unsupported file type: ${ext}. Supported formats: PDF, CSV, Excel, Word, TXT, JSON, ZIP.`);
         continue;
       }
 
-      // Validate file size
       if (file.size > MAX_FILE_SIZE) {
         setError(`File too large: ${file.name} (${(file.size / 1024 / 1024).toFixed(1)}MB). Maximum size is 10MB.`);
         continue;
@@ -59,7 +66,6 @@ export default function DocumentUploadZone({ onProcessed }: DocumentUploadZonePr
       }
     }
 
-    // Reset the input so the same file can be re-selected
     if (inputRef.current) inputRef.current.value = '';
   }, [onProcessed]);
 
@@ -80,7 +86,7 @@ export default function DocumentUploadZone({ onProcessed }: DocumentUploadZonePr
   }, [handleFiles]);
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <div
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
@@ -88,11 +94,11 @@ export default function DocumentUploadZone({ onProcessed }: DocumentUploadZonePr
         onClick={() => !processing && inputRef.current?.click()}
         className={`
           relative flex flex-col items-center justify-center
-          rounded-xl border-2 border-dashed p-8 cursor-pointer
+          rounded-2xl border-2 border-dashed p-10 cursor-pointer
           transition-all duration-200
           ${isDragging
-            ? 'border-blue-400 bg-blue-500/10 scale-[1.01]'
-            : 'border-slate-600 bg-slate-900/50 hover:border-blue-500/50 hover:bg-slate-800/50'
+            ? 'border-[#0071e3] bg-[#0071e3]/5 scale-[1.01]'
+            : 'border-[#d2d2d7] bg-[#f5f5f7]/50 hover:border-[#0071e3]/50 hover:bg-[#f5f5f7]'
           }
           ${processing ? 'pointer-events-none opacity-80' : ''}
         `}
@@ -100,54 +106,58 @@ export default function DocumentUploadZone({ onProcessed }: DocumentUploadZonePr
         <input
           ref={inputRef}
           type="file"
-          accept=".pdf,.csv"
+          accept={ACCEPTED_MIME}
           multiple
           onChange={(e) => handleFiles(e.target.files)}
           className="hidden"
         />
 
         {processing ? (
-          <div className="flex flex-col items-center gap-3 w-full max-w-sm">
-            <Loader2 className="w-8 h-8 text-blue-400 animate-spin" />
-            <p className="text-sm text-slate-300 font-medium">{fileName}</p>
-            <div className="w-full bg-slate-700 rounded-full h-2">
+          <div className="flex flex-col items-center gap-4 w-full max-w-sm">
+            <Loader2 className="w-10 h-10 text-[#0071e3] animate-spin" />
+            <p className="text-sm text-[#1d1d1f] font-medium">{fileName}</p>
+            <div className="w-full bg-[#e8e8ed] rounded-full h-2.5">
               <div
-                className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                className="bg-[#0071e3] h-2.5 rounded-full transition-all duration-300"
                 style={{ width: `${progress?.percent || 0}%` }}
               />
             </div>
-            <p className="text-xs text-slate-400">{progress?.message || 'Processing...'}</p>
+            <p className="text-xs text-[#6e6e73]">{progress?.message || 'Processing...'}</p>
           </div>
         ) : (
           <>
-            <div className="w-14 h-14 rounded-full bg-blue-500/10 flex items-center justify-center mb-3">
-              <Upload className="w-7 h-7 text-blue-400" />
+            <div className="w-16 h-16 rounded-2xl bg-[#0071e3]/10 flex items-center justify-center mb-4">
+              <Upload className="w-8 h-8 text-[#0071e3]" />
             </div>
-            <p className="text-base font-medium text-slate-200 mb-1">
-              Drop financial statements here
+            <p className="text-lg font-semibold text-[#1d1d1f] mb-1">
+              Drop your financial documents here
             </p>
-            <p className="text-sm text-slate-400 mb-3">
-              or <span className="text-blue-400 hover:underline">click to browse</span>
+            <p className="text-sm text-[#6e6e73] mb-5">
+              or <span className="text-[#0071e3] font-medium hover:underline">click to browse</span>
             </p>
-            <div className="flex items-center gap-4 text-xs text-slate-500">
-              <span className="flex items-center gap-1">
-                <FileText className="w-3.5 h-3.5" /> PDF, CSV
-              </span>
-              <span>Max 10MB</span>
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              {FILE_CATEGORIES.map(({ icon: Icon, label, extensions }) => (
+                <div key={label} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-[#e8e8ed] text-xs text-[#6e6e73]">
+                  <Icon className="w-3.5 h-3.5 text-[#86868b]" />
+                  <span className="font-medium text-[#1d1d1f]">{label}</span>
+                  <span className="text-[#86868b]">{extensions}</span>
+                </div>
+              ))}
             </div>
+            <p className="text-xs text-[#86868b] mt-4">Maximum file size: 10MB</p>
           </>
         )}
       </div>
 
       {error && (
-        <div className="flex items-start gap-2 text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg p-3">
+        <div className="flex items-start gap-2.5 text-sm text-[#ff3b30] bg-[#ff3b30]/5 border border-[#ff3b30]/15 rounded-xl p-4">
           <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
           <p>{error}</p>
         </div>
       )}
 
-      <div className="flex items-center gap-2 text-xs text-slate-500">
-        <Shield className="w-3.5 h-3.5 text-emerald-500" />
+      <div className="flex items-center gap-2 text-xs text-[#6e6e73] bg-[#34c759]/5 border border-[#34c759]/15 rounded-xl px-4 py-3">
+        <Shield className="w-4 h-4 text-[#34c759]" />
         <span>Your documents are processed locally and never uploaded to any server</span>
       </div>
     </div>

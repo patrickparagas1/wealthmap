@@ -16,20 +16,20 @@ interface ReviewExtractedDataProps {
 function ConfidenceBadge({ level }: { level: 'high' | 'medium' | 'low' }) {
   if (level === 'high') {
     return (
-      <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400">
+      <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-[#34c759]/10 text-[#34c759] font-medium">
         <CheckCircle2 className="w-3 h-3" /> High
       </span>
     );
   }
   if (level === 'medium') {
     return (
-      <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-yellow-500/15 text-yellow-400">
+      <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-[#ff9500]/10 text-[#ff9500] font-medium">
         <AlertTriangle className="w-3 h-3" /> Medium
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-red-500/15 text-red-400">
+    <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-[#ff3b30]/10 text-[#ff3b30] font-medium">
       <HelpCircle className="w-3 h-3" /> Low
     </span>
   );
@@ -66,10 +66,10 @@ function getValueLabel(type: string): string {
 }
 
 const CATEGORY_CONFIG = {
-  income: { icon: DollarSign, label: 'Income', color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
-  asset: { icon: TrendingUp, label: 'Assets', color: 'text-blue-400', bg: 'bg-blue-500/10' },
-  liability: { icon: CreditCard, label: 'Liabilities', color: 'text-red-400', bg: 'bg-red-500/10' },
-  expense: { icon: Building, label: 'Expenses', color: 'text-amber-400', bg: 'bg-amber-500/10' },
+  income: { icon: DollarSign, label: 'Income', color: 'text-[#34c759]', bg: 'bg-[#34c759]/10' },
+  asset: { icon: TrendingUp, label: 'Assets', color: 'text-[#0071e3]', bg: 'bg-[#0071e3]/10' },
+  liability: { icon: CreditCard, label: 'Liabilities', color: 'text-[#ff3b30]', bg: 'bg-[#ff3b30]/10' },
+  expense: { icon: Building, label: 'Expenses', color: 'text-[#ff9500]', bg: 'bg-[#ff9500]/10' },
 };
 
 type CategoryKey = keyof typeof CATEGORY_CONFIG;
@@ -135,7 +135,6 @@ export default function ReviewExtractedData({ items, documentType, fileName, onI
     const selected = items
       .map((item, index) => {
         if (!selectedIds.has(index)) return null;
-        // Apply edited values
         if (editedValues[index] !== undefined) {
           const clone = { ...item, data: { ...item.data } };
           const val = editedValues[index];
@@ -159,13 +158,13 @@ export default function ReviewExtractedData({ items, documentType, fileName, onI
 
   if (!hasItems) {
     return (
-      <div className="bg-slate-900/50 rounded-xl border border-slate-700 p-8 text-center">
-        <HelpCircle className="w-12 h-12 text-slate-500 mx-auto mb-3" />
-        <p className="text-slate-300 font-medium mb-1">No financial data found</p>
-        <p className="text-sm text-slate-500 mb-4">
+      <div className="bg-white rounded-2xl border border-[#e8e8ed] p-8 text-center shadow-sm">
+        <HelpCircle className="w-12 h-12 text-[#86868b] mx-auto mb-3" />
+        <p className="text-[#1d1d1f] font-semibold mb-1">No financial data found</p>
+        <p className="text-sm text-[#6e6e73] mb-4">
           We couldn&apos;t extract structured data from &quot;{fileName}&quot;. Try a different document.
         </p>
-        <button onClick={onCancel} className="text-sm text-blue-400 hover:underline">
+        <button onClick={onCancel} className="text-sm text-[#0071e3] font-medium hover:underline">
           Try another file
         </button>
       </div>
@@ -173,20 +172,20 @@ export default function ReviewExtractedData({ items, documentType, fileName, onI
   }
 
   return (
-    <div className="bg-slate-900/50 rounded-xl border border-slate-700 overflow-hidden">
+    <div className="bg-white rounded-2xl border border-[#e8e8ed] overflow-hidden shadow-sm">
       {/* Header */}
-      <div className="p-4 border-b border-slate-700 flex items-center justify-between">
+      <div className="p-5 border-b border-[#e8e8ed] flex items-center justify-between">
         <div>
-          <h3 className="text-sm font-semibold text-slate-200">Review Extracted Data</h3>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <h3 className="text-base font-semibold text-[#1d1d1f]">Review Extracted Data</h3>
+          <p className="text-xs text-[#6e6e73] mt-0.5">
             {fileName} — {documentType.replace(/_/g, ' ')} — {items.length} items found
           </p>
         </div>
-        <span className="text-xs text-slate-500">{selectedCount} selected</span>
+        <span className="text-xs text-[#6e6e73] bg-[#f5f5f7] px-3 py-1 rounded-full font-medium">{selectedCount} selected</span>
       </div>
 
       {/* Categories */}
-      <div className="divide-y divide-slate-800">
+      <div className="divide-y divide-[#e8e8ed]">
         {(Object.keys(CATEGORY_CONFIG) as CategoryKey[]).map((cat) => {
           const config = CATEGORY_CONFIG[cat];
           const catItems = grouped[cat];
@@ -199,31 +198,31 @@ export default function ReviewExtractedData({ items, documentType, fileName, onI
           return (
             <div key={cat}>
               <div
-                className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-slate-800/50"
+                className="flex items-center justify-between px-5 py-3.5 cursor-pointer hover:bg-[#f5f5f7]"
                 onClick={() => toggleCategory(cat)}
               >
-                <div className="flex items-center gap-2">
-                  <div className={`w-7 h-7 rounded-lg ${config.bg} flex items-center justify-center`}>
+                <div className="flex items-center gap-2.5">
+                  <div className={`w-8 h-8 rounded-xl ${config.bg} flex items-center justify-center`}>
                     <Icon className={`w-4 h-4 ${config.color}`} />
                   </div>
-                  <span className="text-sm font-medium text-slate-200">
+                  <span className="text-sm font-semibold text-[#1d1d1f]">
                     {config.label}
                   </span>
-                  <span className="text-xs text-slate-500">({catItems.length})</span>
+                  <span className="text-xs text-[#86868b]">({catItems.length})</span>
                 </div>
                 <div className="flex items-center gap-3">
                   <button
                     onClick={(e) => { e.stopPropagation(); toggleAllInCategory(cat); }}
-                    className="text-xs text-blue-400 hover:underline"
+                    className="text-xs text-[#0071e3] font-medium hover:underline"
                   >
                     {allSelected ? 'Deselect all' : 'Select all'}
                   </button>
-                  {isExpanded ? <ChevronUp className="w-4 h-4 text-slate-500" /> : <ChevronDown className="w-4 h-4 text-slate-500" />}
+                  {isExpanded ? <ChevronUp className="w-4 h-4 text-[#86868b]" /> : <ChevronDown className="w-4 h-4 text-[#86868b]" />}
                 </div>
               </div>
 
               {isExpanded && (
-                <div className="px-4 pb-3 space-y-2">
+                <div className="px-5 pb-4 space-y-2">
                   {catItems.map(({ index, item }) => {
                     const value = editedValues[index] ?? getItemValue(item);
                     const description = getItemDescription(item);
@@ -232,32 +231,32 @@ export default function ReviewExtractedData({ items, documentType, fileName, onI
                     return (
                       <div
                         key={index}
-                        className={`flex items-center gap-3 p-2.5 rounded-lg border transition-all ${
+                        className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${
                           isSelected
-                            ? 'border-slate-600 bg-slate-800/40'
-                            : 'border-transparent bg-slate-800/20 opacity-50'
+                            ? 'border-[#d2d2d7] bg-[#f5f5f7]'
+                            : 'border-transparent bg-[#fafafa] opacity-50'
                         }`}
                       >
                         <input
                           type="checkbox"
                           checked={isSelected}
                           onChange={() => toggleItem(index)}
-                          className="w-4 h-4 rounded border-slate-600 text-blue-500 focus:ring-blue-500/30 bg-slate-700"
+                          className="w-4 h-4 rounded border-[#d2d2d7] text-[#0071e3] focus:ring-[#0071e3]/30 accent-[#0071e3]"
                         />
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm text-slate-300 truncate">{description}</p>
-                          <p className="text-xs text-slate-500">{item.source}</p>
+                          <p className="text-sm text-[#1d1d1f] truncate font-medium">{description}</p>
+                          <p className="text-xs text-[#86868b]">{item.source}</p>
                         </div>
                         <div className="flex items-center gap-2">
                           <div className="relative">
-                            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-slate-500">$</span>
+                            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-[#86868b]">$</span>
                             <input
                               type="text"
                               value={value.toLocaleString()}
                               onChange={(e) => handleValueChange(index, e.target.value)}
-                              className="w-28 pl-5 pr-2 py-1 text-right text-sm font-mono bg-slate-700/50 border border-slate-600 rounded text-slate-200 focus:outline-none focus:border-blue-500"
+                              className="w-28 pl-5 pr-2 py-1.5 text-right text-sm font-mono bg-white border border-[#d2d2d7] rounded-lg text-[#1d1d1f] focus:outline-none focus:border-[#0071e3] focus:ring-2 focus:ring-[#0071e3]/15"
                             />
-                            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-slate-500">
+                            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-[#86868b]">
                               {getValueLabel(item.type)}
                             </span>
                           </div>
@@ -274,17 +273,17 @@ export default function ReviewExtractedData({ items, documentType, fileName, onI
       </div>
 
       {/* Actions */}
-      <div className="p-4 border-t border-slate-700 flex items-center justify-between">
+      <div className="p-5 border-t border-[#e8e8ed] flex items-center justify-between bg-[#fafafa]">
         <button
           onClick={onCancel}
-          className="px-4 py-2 text-sm text-slate-400 hover:text-slate-200 transition-colors"
+          className="px-4 py-2 text-sm text-[#6e6e73] hover:text-[#1d1d1f] font-medium transition-colors"
         >
           Cancel
         </button>
         <button
           onClick={handleImport}
           disabled={selectedCount === 0}
-          className="px-5 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          className="px-6 py-2.5 text-sm font-semibold bg-[#0071e3] text-white rounded-full hover:bg-[#0077ed] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         >
           Import {selectedCount} Items to Plan
         </button>

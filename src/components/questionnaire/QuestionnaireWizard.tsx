@@ -8,7 +8,7 @@ import { validateSection, ValidationError } from '@/lib/validation';
 import {
   User, DollarSign, CreditCard, Landmark, TrendingDown, Target,
   BarChart3, Shield, FileText, Calculator, ChevronLeft, ChevronRight,
-  CheckCircle2, ArrowLeft, Upload
+  CheckCircle2, ArrowLeft, Upload, Clock, Sparkles
 } from 'lucide-react';
 import PersonalInfoSection from './sections/PersonalInfoSection';
 import IncomeSection from './sections/IncomeSection';
@@ -27,17 +27,71 @@ import type { ParseResult, MappedItem } from '@/lib/parsers';
 import type { IncomeSource, Expense, Asset, Liability } from '@/lib/types';
 
 const steps = [
-  { id: 'personal_info', label: 'Personal Info', icon: User, component: PersonalInfoSection },
-  { id: 'income', label: 'Income', icon: DollarSign, component: IncomeSection },
-  { id: 'expenses', label: 'Expenses', icon: CreditCard, component: ExpenseSection },
-  { id: 'assets', label: 'Assets', icon: Landmark, component: AssetsSection },
-  { id: 'liabilities', label: 'Debts', icon: TrendingDown, component: LiabilitiesSection },
-  { id: 'goals', label: 'Goals', icon: Target, component: GoalsSection },
-  { id: 'risk_assessment', label: 'Risk Profile', icon: BarChart3, component: RiskAssessmentSection },
-  { id: 'insurance', label: 'Insurance', icon: Shield, component: InsuranceSection },
-  { id: 'estate', label: 'Estate', icon: FileText, component: EstateSection },
-  { id: 'tax', label: 'Tax Info', icon: Calculator, component: TaxSection },
+  {
+    id: 'personal_info', label: 'Personal Info', icon: User, component: PersonalInfoSection,
+    subtitle: 'Let\u2019s get to know you so we can personalize your financial plan.',
+    estimate: '2 min',
+  },
+  {
+    id: 'income', label: 'Income', icon: DollarSign, component: IncomeSection,
+    subtitle: 'Understanding your income helps us build projections you can trust.',
+    estimate: '2 min',
+  },
+  {
+    id: 'expenses', label: 'Expenses', icon: CreditCard, component: ExpenseSection,
+    subtitle: 'Knowing where your money goes is the first step to optimizing it.',
+    estimate: '3 min',
+  },
+  {
+    id: 'assets', label: 'Assets', icon: Landmark, component: AssetsSection,
+    subtitle: 'Let\u2019s take stock of what you\u2019ve built so far \u2014 savings, investments, and property.',
+    estimate: '3 min',
+  },
+  {
+    id: 'liabilities', label: 'Debts', icon: TrendingDown, component: LiabilitiesSection,
+    subtitle: 'Everyone has obligations \u2014 let\u2019s factor them into your complete picture.',
+    estimate: '2 min',
+  },
+  {
+    id: 'goals', label: 'Goals', icon: Target, component: GoalsSection,
+    subtitle: 'What does financial success look like for you? Define your short and long-term objectives.',
+    estimate: '3 min',
+  },
+  {
+    id: 'risk_assessment', label: 'Risk Profile', icon: BarChart3, component: RiskAssessmentSection,
+    subtitle: 'How do you feel about market ups and downs? This helps us tailor your investment strategy.',
+    estimate: '2 min',
+  },
+  {
+    id: 'insurance', label: 'Insurance', icon: Shield, component: InsuranceSection,
+    subtitle: 'Review your current coverage to identify any gaps in protection.',
+    estimate: '2 min',
+  },
+  {
+    id: 'estate', label: 'Estate', icon: FileText, component: EstateSection,
+    subtitle: 'Ensure your legacy is protected with proper estate planning documents.',
+    estimate: '1 min',
+  },
+  {
+    id: 'tax', label: 'Tax Info', icon: Calculator, component: TaxSection,
+    subtitle: 'Additional details that help us find tax optimization opportunities for you.',
+    estimate: '2 min',
+  },
 ] as const;
+
+// Encouragement messages shown between sections
+const encouragements = [
+  '', // Step 0 has no encouragement (first step)
+  'Great start! Your personal info is set.',
+  'Nice \u2014 your income details will power accurate projections.',
+  'Expenses tracked! This helps identify savings opportunities.',
+  'Your asset picture is taking shape.',
+  'Debts factored in \u2014 now let\u2019s set your goals.',
+  'Love your ambition! Now let\u2019s understand your risk comfort.',
+  'Almost there \u2014 a few more details to complete your plan.',
+  'Insurance reviewed! Just two more steps.',
+  'Nearly done! One final section remaining.',
+];
 
 type UploadPhase = 'idle' | 'upload' | 'review' | 'done';
 
@@ -105,31 +159,43 @@ export default function QuestionnaireWizard() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 theme-dark">
-      {/* Top bar */}
-      <div className="glass border-b border-slate-800 sticky top-0 z-40">
+    <div className="min-h-screen bg-[#f5f5f7]">
+      {/* Top bar — clean glass effect */}
+      <div className="glass border-b border-[#e8e8ed] sticky top-0 z-40">
         <div className="max-w-5xl mx-auto px-6 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <button onClick={() => router.push('/')} className="text-slate-400 hover:text-white">
+            <button onClick={() => router.push('/')} className="text-[#86868b] hover:text-[#1d1d1f] transition-colors">
               <ArrowLeft className="w-5 h-5" />
             </button>
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-emerald-500 flex items-center justify-center">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#0071e3] to-[#af52de] flex items-center justify-center">
                 <BarChart3 className="w-4 h-4 text-white" />
               </div>
-              <span className="font-semibold text-white text-sm">WealthMap</span>
+              <span className="font-semibold text-[#1d1d1f] text-sm">WealthMap</span>
             </div>
           </div>
-          <div className="text-sm text-slate-400">
-            Step {currentStep + 1} of {steps.length}
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5 text-xs text-[#86868b]">
+              <Clock className="w-3.5 h-3.5" />
+              <span>~{step.estimate}</span>
+            </div>
+            <div className="text-sm text-[#6e6e73] font-medium">
+              {currentStep + 1} of {steps.length}
+            </div>
           </div>
         </div>
-        {/* Progress bar */}
-        <div className="h-1 bg-slate-800">
-          <div
-            className="h-full bg-gradient-to-r from-blue-500 to-emerald-500 transition-all duration-500"
-            style={{ width: `${progress}%` }}
-          />
+        {/* Segmented progress bar */}
+        <div className="h-1 bg-[#e8e8ed] flex">
+          {steps.map((_, i) => (
+            <div
+              key={i}
+              className={cn(
+                'flex-1 transition-all duration-500',
+                i <= currentStep ? 'bg-[#0071e3]' : 'bg-transparent',
+                i < steps.length - 1 ? 'mr-px' : ''
+              )}
+            />
+          ))}
         </div>
       </div>
 
@@ -146,14 +212,14 @@ export default function QuestionnaireWizard() {
                   key={s.id}
                   onClick={() => { setErrors([]); setCurrentStep(i); window.scrollTo(0, 0); }}
                   className={cn(
-                    'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all',
-                    isActive ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' :
-                    isComplete ? 'text-emerald-400 hover:bg-slate-800/50' :
-                    'text-slate-500 hover:text-slate-300 hover:bg-slate-800/30'
+                    'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all',
+                    isActive ? 'bg-[#0071e3]/8 text-[#0071e3] font-medium shadow-sm border border-[#0071e3]/15' :
+                    isComplete ? 'text-[#34c759] hover:bg-[#f5f5f7]' :
+                    'text-[#86868b] hover:text-[#1d1d1f] hover:bg-white'
                   )}
                 >
                   {isComplete ? (
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                    <CheckCircle2 className="w-4 h-4 text-[#34c759] flex-shrink-0" />
                   ) : (
                     <Icon className="w-4 h-4 flex-shrink-0" />
                   )}
@@ -166,18 +232,26 @@ export default function QuestionnaireWizard() {
 
         {/* Main content */}
         <div className="flex-1 min-w-0">
+          {/* Encouragement banner */}
+          {currentStep > 0 && encouragements[currentStep] && (
+            <div className="flex items-center gap-2 mb-4 px-4 py-2.5 rounded-xl bg-[#34c759]/8 border border-[#34c759]/15">
+              <Sparkles className="w-4 h-4 text-[#34c759]" />
+              <p className="text-sm text-[#1d1d1f] font-medium">{encouragements[currentStep]}</p>
+            </div>
+          )}
+
           {/* Quick Import Banner */}
           {uploadPhase === 'idle' && (
             <button
               onClick={() => setUploadPhase('upload')}
-              className="w-full mb-6 flex items-center gap-3 p-4 rounded-xl border border-dashed border-blue-500/30 bg-blue-500/5 hover:bg-blue-500/10 hover:border-blue-500/50 transition-all group"
+              className="w-full mb-6 flex items-center gap-3 p-4 rounded-2xl border border-dashed border-[#0071e3]/25 bg-[#0071e3]/4 hover:bg-[#0071e3]/8 hover:border-[#0071e3]/40 transition-all group"
             >
-              <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center group-hover:bg-blue-500/20 transition-colors">
-                <Upload className="w-5 h-5 text-blue-400" />
+              <div className="w-10 h-10 rounded-xl bg-[#0071e3]/10 flex items-center justify-center group-hover:bg-[#0071e3]/15 transition-colors">
+                <Upload className="w-5 h-5 text-[#0071e3]" />
               </div>
               <div className="text-left">
-                <p className="text-sm font-medium text-blue-400">Quick Import</p>
-                <p className="text-xs text-slate-500">Upload bank statements, tax returns, or investment reports for instant data entry</p>
+                <p className="text-sm font-semibold text-[#0071e3]">Quick Import</p>
+                <p className="text-xs text-[#6e6e73]">Upload bank statements, tax returns, or investment reports for instant data entry</p>
               </div>
             </button>
           )}
@@ -185,8 +259,8 @@ export default function QuestionnaireWizard() {
           {uploadPhase === 'upload' && (
             <div className="mb-6">
               <div className="flex items-center justify-between mb-3">
-                <h2 className="text-lg font-semibold text-white">Upload Documents</h2>
-                <button onClick={() => setUploadPhase('idle')} className="text-xs text-slate-400 hover:text-slate-200">
+                <h2 className="text-lg font-semibold text-[#1d1d1f]">Upload Documents</h2>
+                <button onClick={() => setUploadPhase('idle')} className="text-xs text-[#6e6e73] hover:text-[#1d1d1f] font-medium">
                   Close
                 </button>
               </div>
@@ -216,28 +290,18 @@ export default function QuestionnaireWizard() {
             </div>
           )}
 
-          <div className="mb-6">
-            <h1 className="text-2xl font-bold text-white mb-1">{step.label}</h1>
-            <p className="text-sm text-slate-400">
-              {currentStep === 0 && "Let's start with your basic information."}
-              {currentStep === 1 && "Tell us about all your sources of income."}
-              {currentStep === 2 && "Track your monthly expenses by category."}
-              {currentStep === 3 && "List your assets including savings, investments, and property."}
-              {currentStep === 4 && "List any outstanding debts and loans."}
-              {currentStep === 5 && "What are your financial goals?"}
-              {currentStep === 6 && "Help us understand your investment risk tolerance."}
-              {currentStep === 7 && "Review your current insurance coverage."}
-              {currentStep === 8 && "Estate planning document status."}
-              {currentStep === 9 && "Additional tax planning information."}
-            </p>
+          {/* Section header */}
+          <div className="mb-8">
+            <h1 className="text-2xl font-bold text-[#1d1d1f] mb-2">{step.label}</h1>
+            <p className="text-[15px] text-[#6e6e73] leading-relaxed">{step.subtitle}</p>
           </div>
 
           {errors.length > 0 && (
-            <div className="mb-4 p-4 rounded-xl bg-red-500/10 border border-red-500/20">
-              <div className="text-sm font-medium text-red-400 mb-2">Please fix the following:</div>
+            <div className="mb-6 p-4 rounded-2xl bg-[#ff3b30]/5 border border-[#ff3b30]/15">
+              <div className="text-sm font-semibold text-[#ff3b30] mb-2">Please fix the following:</div>
               <ul className="space-y-1">
                 {errors.map((e, i) => (
-                  <li key={i} className="text-xs text-red-300">- {e.message}</li>
+                  <li key={i} className="text-sm text-[#ff3b30]/80">- {e.message}</li>
                 ))}
               </ul>
             </div>
@@ -248,15 +312,15 @@ export default function QuestionnaireWizard() {
           </div>
 
           {/* Navigation buttons */}
-          <div className="flex items-center justify-between mt-8 pt-6 border-t border-slate-800">
+          <div className="flex items-center justify-between mt-10 pt-6 border-t border-[#e8e8ed]">
             <button
               onClick={goPrev}
               disabled={currentStep === 0}
               className={cn(
-                'flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all',
+                'flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-medium transition-all',
                 currentStep === 0
-                  ? 'text-slate-600 cursor-not-allowed'
-                  : 'text-slate-300 hover:bg-slate-800 border border-slate-700'
+                  ? 'text-[#d2d2d7] cursor-not-allowed'
+                  : 'text-[#6e6e73] hover:text-[#1d1d1f] hover:bg-white border border-[#d2d2d7]'
               )}
             >
               <ChevronLeft className="w-4 h-4" />
@@ -266,15 +330,15 @@ export default function QuestionnaireWizard() {
             {currentStep < steps.length - 1 ? (
               <button
                 onClick={goNext}
-                className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white text-sm font-medium rounded-xl hover:from-blue-600 hover:to-blue-700 shadow-lg shadow-blue-500/20"
+                className="flex items-center gap-2 px-7 py-2.5 bg-[#0071e3] text-white text-sm font-semibold rounded-full hover:bg-[#0077ed] shadow-lg shadow-[#0071e3]/20 transition-all"
               >
-                Next
+                Continue
                 <ChevronRight className="w-4 h-4" />
               </button>
             ) : (
               <button
                 onClick={handleFinish}
-                className="flex items-center gap-2 px-8 py-3 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white font-semibold rounded-xl hover:from-emerald-600 hover:to-emerald-700 shadow-lg shadow-emerald-500/20"
+                className="flex items-center gap-2 px-8 py-3 bg-[#34c759] text-white font-semibold rounded-full hover:bg-[#30d158] shadow-lg shadow-[#34c759]/20 transition-all"
               >
                 <CheckCircle2 className="w-5 h-5" />
                 Generate My Financial Plan

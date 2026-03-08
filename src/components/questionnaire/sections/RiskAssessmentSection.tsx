@@ -21,32 +21,32 @@ export default function RiskAssessmentSection() {
 
   return (
     <div className="space-y-6">
-      <div className="p-5 rounded-xl bg-blue-500/5 border border-blue-500/10">
+      <div className="p-5 rounded-2xl bg-[#0071e3]/5 border border-[#0071e3]/10">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-3">
-            <BarChart3 className="w-5 h-5 text-blue-400" />
+            <BarChart3 className="w-5 h-5 text-[#0071e3]" />
             <div>
-              <div className="text-sm font-medium text-white">Risk Tolerance Assessment</div>
-              <div className="text-xs text-slate-400">{answeredCount} of {totalQuestions} questions answered</div>
+              <div className="text-sm font-medium text-[#1d1d1f]">Risk Tolerance Assessment</div>
+              <div className="text-xs text-[#6e6e73]">{answeredCount} of {totalQuestions} questions answered</div>
             </div>
           </div>
           {answeredCount > 0 && (
             <div className="text-right">
-              <div className="text-sm font-semibold text-blue-400">{riskLabel}</div>
-              <div className="text-xs text-slate-500">Preliminary result</div>
+              <div className="text-sm font-semibold text-[#0071e3]">{riskLabel}</div>
+              <div className="text-xs text-[#86868b]">Preliminary result</div>
             </div>
           )}
         </div>
-        <div className="w-full bg-slate-700 rounded-full h-2">
-          <div className="bg-gradient-to-r from-blue-500 to-emerald-500 h-2 rounded-full transition-all" style={{ width: `${(answeredCount / totalQuestions) * 100}%` }} />
+        <div className="w-full bg-[#e8e8ed] rounded-full h-2">
+          <div className="bg-[#0071e3] h-2 rounded-full transition-all" style={{ width: `${(answeredCount / totalQuestions) * 100}%` }} />
         </div>
       </div>
 
       {RISK_ASSESSMENT_QUESTIONS.map((q, idx) => (
-        <div key={q.id} className="p-5 rounded-xl bg-slate-800/30 border border-slate-700/50">
+        <div key={q.id} className="p-5 rounded-2xl bg-white border border-[#e8e8ed] shadow-sm">
           <div className="flex items-start gap-3 mb-4">
-            <span className="flex-shrink-0 w-7 h-7 rounded-lg bg-slate-700 flex items-center justify-center text-xs font-semibold text-slate-300">{idx + 1}</span>
-            <p className="text-sm font-medium text-white leading-relaxed">{q.question}</p>
+            <span className="flex-shrink-0 w-7 h-7 rounded-lg bg-[#f5f5f7] border border-[#e8e8ed] flex items-center justify-center text-xs font-semibold text-[#1d1d1f]">{idx + 1}</span>
+            <p className="text-sm font-medium text-[#1d1d1f] leading-relaxed">{q.question}</p>
           </div>
           <div className="space-y-2 ml-10">
             {q.options.map((opt) => {
@@ -58,16 +58,16 @@ export default function RiskAssessmentSection() {
                   className={cn(
                     'w-full text-left px-4 py-3 rounded-xl text-sm transition-all border',
                     isSelected
-                      ? 'bg-blue-500/10 border-blue-500/30 text-blue-300'
-                      : 'bg-slate-800/30 border-slate-700/50 text-slate-400 hover:text-white hover:border-slate-600'
+                      ? 'bg-[#0071e3]/8 border-[#0071e3]/25 text-[#0071e3] font-medium'
+                      : 'bg-[#f5f5f7] border-[#e8e8ed] text-[#6e6e73] hover:text-[#1d1d1f] hover:border-[#d2d2d7]'
                   )}
                 >
                   <div className="flex items-center gap-3">
                     <div className={cn(
                       'w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0',
-                      isSelected ? 'border-blue-500' : 'border-slate-600'
+                      isSelected ? 'border-[#0071e3]' : 'border-[#d2d2d7]'
                     )}>
-                      {isSelected && <div className="w-2 h-2 rounded-full bg-blue-500" />}
+                      {isSelected && <div className="w-2 h-2 rounded-full bg-[#0071e3]" />}
                     </div>
                     {opt.label}
                   </div>
