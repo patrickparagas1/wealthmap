@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Upload, FileText, AlertCircle, Loader2, Shield, FileSpreadsheet, FileArchive, FileCode, CheckCircle2, XCircle } from 'lucide-react';
 import { processDocument, ProcessingProgress, ParseResult } from '@/lib/parsers';
 import type { MappedItem } from '@/lib/parsers';
+import { warmUpPdfParser } from '@/lib/parsers/pdf-parser';
 
 interface DocumentUploadZoneProps {
   onProcessed: (result: ParseResult) => void;
@@ -34,9 +35,11 @@ export default function DocumentUploadZone({ onProcessed }: DocumentUploadZonePr
   const [progress, setProgress] = useState<ProcessingProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [fileStatuses, setFileStatuses] = useState<FileStatus[]>([]);
-  const [currentFileIndex, setCurrentFileIndex] = useState(0);
   const [totalFiles, setTotalFiles] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Pre-load PDF.js library + Web Worker so first upload is instant
+  useEffect(() => { warmUpPdfParser(); }, []);
 
   const handleFiles = useCallback(async (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -72,44 +75,30 @@ export default function DocumentUploadZone({ onProcessed }: DocumentUploadZonePr
     setTotalFiles(validFiles.length);
     setProcessing(true);
 
-    // Process ALL files, accumulate results
+    // Mark all valid files as processing immediately
+    setFileStatuses(prev => prev.map(s =>
+      s.status === 'pending' ? { ...s, status: 'processing' } : s
+    ));
+
+    setProgress({
+      stage: 'reading',
+      message: validFiles.length > 1
+        ? `Processing ${validFiles.length} files in parallel...`
+        : `Processing ${validFiles[0].name}...`,
+      percent: 10,
+    });
+
+    // Process files in parallel (up to 4 concurrent) for maximum speed
+    const CONCURRENCY = 4;
     const allItems: MappedItem[] = [];
     const allRawTexts: string[] = [];
     let combinedDocType = 'unknown';
     let hasAnySuccess = false;
+    let completedCount = 0;
 
-    for (let i = 0; i < validFiles.length; i++) {
-      const file = validFiles[i];
-      setCurrentFileIndex(i);
-
-      // Update status for this file
-      setFileStatuses(prev => prev.map(s =>
-        s.name === file.name && s.status === 'pending'
-          ? { ...s, status: 'processing' }
-          : s
-      ));
-
-      setProgress({
-        stage: 'reading',
-        message: validFiles.length > 1
-          ? `Processing ${file.name} (${i + 1} of ${validFiles.length})...`
-          : `Processing ${file.name}...`,
-        percent: Math.round((i / validFiles.length) * 100),
-      });
-
+    const processOne = async (file: File) => {
       try {
-        const result = await processDocument(file, (p) => {
-          // Scale progress within this file's portion of the total
-          const fileProgressBase = (i / validFiles.length) * 100;
-          const fileProgressRange = (1 / validFiles.length) * 100;
-          setProgress({
-            stage: p.stage,
-            message: validFiles.length > 1
-              ? `${file.name}: ${p.message}`
-              : p.message,
-            percent: Math.round(fileProgressBase + (p.percent / 100) * fileProgressRange),
-          });
-        });
+        const result = await processDocument(file);
 
         if (result.error) {
           setFileStatuses(prev => prev.map(s =>
@@ -135,8 +124,30 @@ export default function DocumentUploadZone({ onProcessed }: DocumentUploadZonePr
             ? { ...s, status: 'error', error: err instanceof Error ? err.message : 'Processing failed' }
             : s
         ));
+      } finally {
+        completedCount++;
+        setProgress({
+          stage: completedCount === validFiles.length ? 'done' : 'matching',
+          message: validFiles.length > 1
+            ? `Processed ${completedCount} of ${validFiles.length} files...`
+            : `Processing ${file.name}...`,
+          percent: Math.round((completedCount / validFiles.length) * 90) + 10,
+        });
       }
+    };
+
+    // Run with concurrency limit
+    const queue = [...validFiles];
+    const workers: Promise<void>[] = [];
+    for (let i = 0; i < Math.min(CONCURRENCY, queue.length); i++) {
+      workers.push((async () => {
+        while (queue.length > 0) {
+          const file = queue.shift()!;
+          await processOne(file);
+        }
+      })());
     }
+    await Promise.all(workers);
 
     // All files processed — send combined result
     setProcessing(false);
@@ -155,19 +166,15 @@ export default function DocumentUploadZone({ onProcessed }: DocumentUploadZonePr
         rawText: allRawTexts.join('\n\n').substring(0, 2000),
       };
 
-      // Small delay so user can see the completed statuses
-      await new Promise(resolve => setTimeout(resolve, 600));
+      // Brief delay so user can see the completed statuses
+      await new Promise(resolve => setTimeout(resolve, 400));
 
       setFileStatuses([]);
       setTotalFiles(0);
       onProcessed(combinedResult);
     } else {
       // All files failed
-      const errorMessages = fileStatuses
-        .filter(s => s.status === 'error')
-        .map(s => `${s.name}: ${s.error}`)
-        .join('; ');
-      setError(errorMessages || 'Could not extract financial data from any file.');
+      setError('Could not extract financial data from any file.');
       setFileStatuses([]);
       setTotalFiles(0);
     }
@@ -225,7 +232,7 @@ export default function DocumentUploadZone({ onProcessed }: DocumentUploadZonePr
             {/* Multi-file progress */}
             {totalFiles > 1 && (
               <p className="text-sm font-semibold text-[#1d1d1f]">
-                Processing file {currentFileIndex + 1} of {totalFiles}
+                Processing {totalFiles} files...
               </p>
             )}
 
