@@ -4,7 +4,7 @@
 // Broadened patterns to handle real-world document variations
 // ============================================================================
 
-export type DocumentType = 'bank_statement' | 'tax_return' | 'investment' | 'pay_stub' | 'mortgage' | 'unknown';
+export type DocumentType = 'bank_statement' | 'tax_return' | 'investment' | 'pay_stub' | 'mortgage' | 'budget' | 'unknown';
 
 export interface ExtractedField {
   label: string;
@@ -66,73 +66,198 @@ function extractLabeledAmount(text: string, labelPattern: RegExp): number | null
   return null;
 }
 
-// --- Document Type Detection (Broadened) ---
+// --- Document Type Detection ---
+// IMPORTANT: Order matters! Pay stub first (very distinctive signals that won't
+// appear in investment docs), then investment (contains "federal"/"balance" boilerplate
+// that matches bank/tax), then tax/bank/budget/mortgage.
 export function detectDocumentType(text: string): DocumentType {
-  const t = text.toLowerCase();
-
-  // Tax return signals (expanded)
-  if (/(form\s*1040|1040-?[a-z]{0,3}|tax\s*return|adjusted\s*gross\s*income|taxable\s*income|filing\s*status|w-?2\s|form\s*w-?2|1099-?[a-z]*|schedule\s*[a-e]|tax\s*year|refund\s*amount|federal\s*tax|irs|internal\s*revenue)/i.test(text)) {
-    return 'tax_return';
-  }
-
-  // Pay stub signals (expanded)
-  if (/(pay\s*stub|pay\s*statement|gross\s*pay|net\s*pay|pay\s*period|earnings\s*statement|ytd\s*(?:gross|earnings|total|net)|gross\s*(?:wages|compensation|earnings)|take[- ]?home\s*pay|pay\s*date|pay\s*rate|hourly\s*rate|hours\s*worked|employer\s*name|employee\s*(?:name|id)|federal\s*withholding|fica|social\s*security\s*tax|medicare\s*tax)/i.test(text)) {
+  // 1. PAY STUB — check FIRST because pay stubs mention "retirement plan",
+  //    "employee contributions", etc. that would falsely match investment.
+  //    Require at least 2 signals to avoid false positives.
+  const payStubSignals = [
+    /pay\s*(?:stub|advice|statement|check)/i,
+    /gross\s*(?:pay|wages?|compensation|earnings)/i,
+    /net\s*pay/i,
+    /hours\s*and\s*earnings/i,
+    /ytd\s*(?:gross|earnings|total|net)/i,
+    /pay\s*rate/i,
+    /(?:federal|fed)\s*(?:withholding|w\/h)/i,
+    /(?:before|after)[- ]?tax\s*deductions/i,
+    /employer\s*paid\s*benefits/i,
+    /pay\s*(?:begin|end)\s*date/i,
+    /employee\s*id/i,
+  ];
+  const payStubHits = payStubSignals.filter(p => p.test(text)).length;
+  if (payStubHits >= 2) {
     return 'pay_stub';
   }
 
-  // Bank statement signals (check BEFORE investment to avoid false positives)
-  if (/(statement\s*(?:period|date|summary)|(?:ending|closing|final|opening|beginning|starting)\s*balance|total\s*(?:deposits?|credits?|withdrawals?|debits?|checks?)|(?:checking|savings?|money\s*market)\s*(?:account|summary)|account\s*(?:summary|statement|activity)|transaction\s*(?:history|summary|detail)|(?:direct\s*)?deposit|atm\s*withdrawal|debit\s*card)/i.test(text)) {
-    return 'bank_statement';
-  }
-
-  // Investment statement signals (expanded — require investment-specific terms)
-  if (/(portfolio\s*(?:value|summary|balance)|investment\s*(?:summary|statement|account|value)|(?:total\s*)?market\s*value|(?:stock|bond|fund)\s*holdings|shares\s*(?:owned|held)|securities|brokerage\s*(?:account|statement)|(?:total\s*)?capital\s*gains?|(?:unrealized|realized)\s*(?:gain|loss)|net\s*asset\s*value|401\s*\(?k\)?\s*(?:statement|summary|balance|account)|(?:traditional|roth)\s*ira\s*(?:statement|summary|balance|account)|(?:mutual|index)\s*fund|stock\s*(?:symbol|ticker)|etf\s*(?:holding|value)|bond\s*(?:fund|portfolio)|asset\s*allocation|dividend\s*(?:reinvest|summary|statement))/i.test(text)) {
+  // 2. INVESTMENT / RETIREMENT — check before bank/tax because these docs
+  //    contain "federal" (SIPC disclaimers), "beginning/ending balance", etc.
+  if (/(investment\s*report|account\s*value|(?:beginning|ending)\s*account\s*value|portfolio\s*(?:value|summary|balance)|brokerage\s*(?:link|account|statement)|(?:roth|traditional)\s*(?:ira|individual\s*retirement)|401\s*\(?k\)?|403\s*\(?b\)?|457\s*\(?b?\)?|thrift\s*savings|retirement\s*(?:savings?\s*(?:statement|program|plan|account))|(?:your|total)\s*account\s*(?:value|summary)|(?:asset\s*allocation|shares?\s*(?:\/\s*)?units?|market\s*value)|vested\s*balance|personal\s*rate\s*of\s*return|(?:mutual|index)\s*fund|(?:stock|bond|fund)\s*holdings|securities|net\s*asset\s*value|dividend\s*(?:reinvest|summary)|(?:unrealized|realized)\s*(?:gain|loss)|change\s*in\s*(?:investment|market|account)\s*value|fidelity|vanguard|schwab|t\.\s*rowe)/i.test(text)) {
     return 'investment';
   }
 
-  // Mortgage statement signals (expanded)
-  if (/(mortgage\s*(?:statement|payment|account)|principal\s*(?:balance|amount|remaining)|escrow\s*(?:balance|payment|account)|loan\s*(?:balance|amount|statement|number)|(?:interest|annual|fixed|variable)\s*rate\s*[:.]?\s*\d|amortization|(?:monthly|regular|minimum)\s*(?:mortgage\s*)?payment|remaining\s*(?:balance|term)|maturity\s*date|lien|deed\s*of\s*trust)/i.test(text)) {
+  // 3. BUDGET — detect structured budget documents (before bank_statement)
+  if (/(?:budget|categories)\s.*(?:actual|difference)/i.test(text) || /(?:fixed|variable)\s.*(?:budget|expense)/i.test(text)) {
+    return 'budget';
+  }
+
+  // 4. TAX RETURN — require strong signals, not just "federal tax"
+  if (/(form\s*1040|1040-?[a-z]{0,3}|tax\s*return|adjusted\s*gross\s*income|w-?2\s*(?:wage|form)|form\s*w-?2|1099-?[a-z]+|schedule\s*[a-e]\b|tax\s*year\s*\d{4}|refund\s*amount|internal\s*revenue)/i.test(text)) {
+    return 'tax_return';
+  }
+
+  // 5. BANK STATEMENT — require banking-specific terms
+  if (/((?:checking|savings?|money\s*market)\s*(?:account|summary|\d))|(?:(?:total|number\s*of)\s*(?:deposits?|credits?|withdrawals?|debits?|checks?))|(?:atm\s*(?:withdrawal|deposit))|(?:debit\s*card\s*purchase)|(?:(?:chase|bank\s*of\s*america|wells\s*fargo|citi|pnc|usaa|capital\s*one)\s*(?:checking|savings|total|bank))/i.test(text)) {
+    return 'bank_statement';
+  }
+  // Also detect bank statements by structure: "Beginning Balance" + "Ending Balance" + no investment terms
+  if (/(?:beginning|opening)\s*balance/i.test(text) && /(?:ending|closing)\s*balance/i.test(text) && !/(?:account\s*value|investment\s*report|portfolio|shares|roth|401)/i.test(text)) {
+    return 'bank_statement';
+  }
+
+  // 6. MORTGAGE
+  if (/(mortgage\s*(?:statement|payment|account)|principal\s*(?:balance|amount|remaining)|escrow\s*(?:balance|payment|account)|amortization|deed\s*of\s*trust)/i.test(text)) {
     return 'mortgage';
   }
 
   return 'unknown';
 }
 
-// --- Bank Statement Extraction (Expanded) ---
+// --- Bank Statement Extraction ---
+// Handles Chase, BofA, Wells Fargo, etc. + budget documents
 function extractBankStatement(text: string): ExtractedField[] {
   const fields: ExtractedField[] = [];
 
-  const endingBalance = extractDollarAfter(text, /(?:ending|closing|final|current|available)\s*balance/i)
-    ?? extractLabeledAmount(text, /(?:ending|closing|final|current|available)\s*balance/i);
-  if (endingBalance !== null) {
-    fields.push({ label: 'Account Balance', value: endingBalance, confidence: 'high', category: 'asset', rawMatch: `Ending Balance: $${endingBalance}` });
+  // Chase format: "Checking & Savings Total $180.66 $3,097.20" or
+  // "TOTAL ASSETS $180.66 $3,097.20" — ending balance is the LAST dollar on that line
+  // Also: "Chase Total Checking 000000602839008 $2,997.20 $6,592.74" — last dollar is ending
+
+  // Try to find each account separately (Chase shows checking + savings)
+  const accountPatterns = [
+    { pattern: /chase\s*total\s*checking[^\n]*?\$([\d,]+\.\d{2})\s*\$([\d,]+\.\d{2})/i, label: 'Checking Account' },
+    { pattern: /chase\s*savings[^\n]*?\$([\d,]+\.\d{2})\s*\$([\d,]+\.\d{2})/i, label: 'Savings Account' },
+  ];
+
+  for (const { pattern, label } of accountPatterns) {
+    const m = text.match(pattern);
+    if (m) {
+      const endingBal = parseDollar(m[2]); // Second dollar is ending balance
+      if (endingBal > 0) {
+        fields.push({ label, value: endingBal, confidence: 'high', category: 'asset', rawMatch: `${label}: $${endingBal.toLocaleString()}` });
+      }
+    }
   }
 
-  const beginningBalance = extractDollarAfter(text, /(?:beginning|opening|starting|previous)\s*balance/i)
-    ?? extractLabeledAmount(text, /(?:beginning|opening|starting|previous)\s*balance/i);
-  if (beginningBalance !== null) {
-    fields.push({ label: 'Previous Balance', value: beginningBalance, confidence: 'medium', category: 'asset', rawMatch: `Beginning Balance: $${beginningBalance}` });
+  // If no specific accounts found, try generic ending balance
+  if (fields.length === 0) {
+    // "Ending Balance $X,XXX.XX" — pick the LAST (largest context) dollar amount
+    const endingLine = text.match(/(?:ending|closing|final)\s*balance[^\n]*/i);
+    if (endingLine) {
+      const dollars = endingLine[0].match(/\$([\d,]+\.\d{2})/g);
+      if (dollars) {
+        const lastVal = parseDollar(dollars[dollars.length - 1].replace('$', ''));
+        if (lastVal > 0) {
+          fields.push({ label: 'Account Balance', value: lastVal, confidence: 'high', category: 'asset', rawMatch: `Ending Balance: $${lastVal.toLocaleString()}` });
+        }
+      }
+    }
   }
 
-  const totalDeposits = extractDollarAfter(text, /total\s*(?:deposits?|credits?|additions?|money\s*in)/i)
-    ?? extractLabeledAmount(text, /total\s*(?:deposits?|credits?|additions?|money\s*in)/i);
-  if (totalDeposits !== null) {
-    fields.push({ label: 'Monthly Deposits', value: totalDeposits, confidence: 'medium', category: 'income', rawMatch: `Total Deposits: $${totalDeposits}` });
+  // TOTAL ASSETS line (Chase summary)
+  if (fields.length === 0) {
+    const totalAssetsMatch = text.match(/total\s*assets[^\n]*?\$([\d,]+\.\d{2})\s*\$([\d,]+\.\d{2})/i);
+    if (totalAssetsMatch) {
+      const endingBal = parseDollar(totalAssetsMatch[2]);
+      if (endingBal > 0) {
+        fields.push({ label: 'Total Bank Balance', value: endingBal, confidence: 'high', category: 'asset', rawMatch: `Total Assets: $${endingBal.toLocaleString()}` });
+      }
+    }
   }
 
-  const totalWithdrawals = extractDollarAfter(text, /total\s*(?:withdrawals?|debits?|subtractions?|checks?|money\s*out)/i)
-    ?? extractLabeledAmount(text, /total\s*(?:withdrawals?|debits?|subtractions?|checks?|money\s*out)/i);
-  if (totalWithdrawals !== null) {
-    fields.push({ label: 'Monthly Expenses', value: totalWithdrawals, confidence: 'medium', category: 'expense', rawMatch: `Total Withdrawals: $${totalWithdrawals}` });
+  // Beginning balance for context — pick the FIRST dollar after the keyword
+  // (not the last, because single-line PDF text can have many unrelated dollars after it)
+  const beginBal = extractDollarAfter(text, /(?:beginning|opening|starting)\s*balance/i);
+  if (beginBal !== null && beginBal > 0) {
+    fields.push({ label: 'Previous Balance', value: beginBal, confidence: 'medium', category: 'asset', rawMatch: `Beginning Balance: $${beginBal.toLocaleString()}` });
   }
 
-  // Account type detection
-  if (/checking/i.test(text)) {
-    fields.push({ label: 'Account Type', value: 'checking', confidence: 'high', category: 'asset', rawMatch: 'Checking Account' });
-  } else if (/savings?/i.test(text)) {
-    fields.push({ label: 'Account Type', value: 'savings', confidence: 'high', category: 'asset', rawMatch: 'Savings Account' });
-  } else if (/money\s*market/i.test(text)) {
-    fields.push({ label: 'Account Type', value: 'savings', confidence: 'medium', category: 'asset', rawMatch: 'Money Market Account' });
+  // Deposits total
+  const totalDeposits = extractDollarAfter(text, /total\s*(?:deposits?|credits?|additions?|money\s*in)/i);
+  if (totalDeposits !== null && totalDeposits > 0) {
+    fields.push({ label: 'Monthly Deposits', value: totalDeposits, confidence: 'medium', category: 'income', rawMatch: `Total Deposits: $${totalDeposits.toLocaleString()}` });
+  }
+
+  // Withdrawals total
+  const totalWithdrawals = extractDollarAfter(text, /total\s*(?:withdrawals?|debits?|subtractions?|checks?\s*paid|money\s*out)/i);
+  if (totalWithdrawals !== null && totalWithdrawals > 0) {
+    fields.push({ label: 'Monthly Expenses', value: totalWithdrawals, confidence: 'medium', category: 'expense', rawMatch: `Total Withdrawals: $${totalWithdrawals.toLocaleString()}` });
+  }
+
+  return fields;
+}
+
+/**
+ * Parse budget documents — handles both multi-line and single-line PDF text.
+ * Budget items follow "Label Amount Amount" pattern where budget ≈ actual.
+ */
+function extractBudgetItems(text: string): ExtractedField[] {
+  const fields: ExtractedField[] = [];
+  const seen = new Set<string>();
+
+  // Income: "Fixed 7796.98" (total monthly income)
+  const incomeMatch = text.match(/\bFixed\s+([\d,]+(?:\.\d{2})?)/);
+  if (incomeMatch) {
+    const val = parseDollar(incomeMatch[1]);
+    if (val > 1000) {
+      fields.push({ label: 'Monthly Income', value: val, confidence: 'high', category: 'income', rawMatch: `Monthly Income: $${val}` });
+    }
+  }
+
+  // Find "Savings" section marker position for category classification
+  const savingsIdx = text.toLowerCase().indexOf('savings');
+
+  // Clean text: remove headers and income source labels so they don't absorb expense labels
+  // e.g., "UCI Health - Monthly Rent 3100 3100" → "Rent 3100 3100"
+  const cleanText = text
+    .replace(/Categories\s+Budget\s+Actual\s+Difference/gi, '')
+    .replace(/Income\s+Date\s+Source\s+Income\s+Amount\s+Outcome\s+Date\s+Purchase\s+Type\s+Cost/gi, '')
+    .replace(/[A-Za-z\s]+?-\s*Monthly\s*/gi, '') // Remove "UCI Health - Monthly" style income labels
+    .replace(/\bFixed\s+[\d,.]+/g, '') // Remove "Fixed 7796.98" (income total)
+    .replace(/\bTotal\s+[\d,.]+\s+\d+\s+[\d,.]+/g, ''); // Remove "Total 7658.05 0 7658.05"
+
+  // Match all "Label Amount Amount" patterns using backreference (both amounts equal)
+  // Works on both single-line and multi-line text
+  const pattern = /([A-Za-z][A-Za-z\s\/\-&().]+?)\s+(\d+(?:\.\d{1,2})?)\s+\2(?=\s|[A-Z]|$)/g;
+  let match;
+
+  while ((match = pattern.exec(cleanText)) !== null) {
+    let label = match[1].trim();
+    const amount = parseDollar(match[2]);
+
+    // Strip leading section markers from labels (e.g., "Variable Car Gas" → "Car Gas")
+    label = label.replace(/^(?:Fixed|Variable|Savings)\s+/i, '').trim();
+
+    // Skip headers, section markers, and totals
+    if (/^(?:Total|Budget|Actual|Categories|Income|Fixed|Variable|Savings|Date|Source|Amount|Outcome|Type|Cost)$/i.test(label)) continue;
+    if (label.length < 2) continue;
+
+    if (amount > 0 && amount < 100000 && !seen.has(label.toLowerCase())) {
+      seen.add(label.toLowerCase());
+
+      // Use original text position for savings classification
+      const labelPos = text.toLowerCase().indexOf(label.toLowerCase());
+      const isSavings = savingsIdx > -1 && labelPos >= savingsIdx;
+
+      fields.push({
+        label,
+        value: amount,
+        confidence: 'medium',
+        category: isSavings ? 'asset' : 'expense',
+        rawMatch: `${label}: $${amount}`,
+      });
+    }
   }
 
   return fields;
@@ -219,107 +344,276 @@ function extractTaxReturn(text: string): ExtractedField[] {
   return fields;
 }
 
-// --- Investment Statement Extraction (Expanded) ---
+// --- Investment Statement Extraction ---
+// Handles Fidelity, Vanguard, Schwab retirement + brokerage statements
 function extractInvestment(text: string): ExtractedField[] {
   const fields: ExtractedField[] = [];
 
-  const accountValue = extractDollarAfter(text, /(?:account|portfolio|total|market|net\s*asset|net\s*account|current)\s*(?:value|balance|worth)/i)
-    ?? extractLabeledAmount(text, /(?:account|portfolio|total|market|net)\s*(?:value|balance)/i);
-  if (accountValue !== null) {
-    fields.push({ label: 'Investment Account Value', value: accountValue, confidence: 'high', category: 'asset', rawMatch: `Account Value: $${accountValue}` });
+  // 1. Account Value — try multiple patterns used by real statements
+  // Fidelity: "Your Account Value: $44,512.10" or "Ending Account Value ** $44,512.10"
+  // Fidelity retirement: "Ending Balance $61,500.63" or "Vested Balance $61,500.63"
+  const accountValuePatterns = [
+    /your\s*account\s*value\s*[:.]?\s*\$\s?([\d,]+(?:\.\d{2})?)/i,
+    /ending\s*account\s*value\s*\*{0,2}\s*\$\s?([\d,]+(?:\.\d{2})?)/i,
+    /(?:ending|closing)\s*balance\s*\$\s?([\d,]+(?:\.\d{2})?)/i,
+    /vested\s*balance\s*\$\s?([\d,]+(?:\.\d{2})?)/i,
+    /(?:total|net|current|market)\s*(?:account\s*)?(?:value|balance)\s*[:.]?\s*\$\s?([\d,]+(?:\.\d{2})?)/i,
+    /portfolio\s*(?:value|balance)\s*[:.]?\s*\$\s?([\d,]+(?:\.\d{2})?)/i,
+  ];
+
+  let accountValue: number | null = null;
+  for (const pat of accountValuePatterns) {
+    const m = text.match(pat);
+    if (m) {
+      const val = parseDollar(m[1]);
+      if (val > 0 && (accountValue === null || val > accountValue)) {
+        accountValue = val;
+      }
+    }
   }
 
-  // 401k / IRA / account type detection
-  if (/401\s*\(?k\)?/i.test(text)) {
-    fields.push({ label: 'Account Type', value: '401k', confidence: 'high', category: 'asset', rawMatch: '401(k) Account' });
-  } else if (/roth\s*ira/i.test(text)) {
-    fields.push({ label: 'Account Type', value: 'roth_ira', confidence: 'high', category: 'asset', rawMatch: 'Roth IRA' });
-  } else if (/traditional\s*ira/i.test(text)) {
-    fields.push({ label: 'Account Type', value: 'traditional_ira', confidence: 'high', category: 'asset', rawMatch: 'Traditional IRA' });
-  } else if (/403\s*\(?b\)?/i.test(text)) {
-    fields.push({ label: 'Account Type', value: '401k', confidence: 'high', category: 'asset', rawMatch: '403(b) Account' });
-  } else if (/457\s*\(?b?\)?/i.test(text)) {
-    fields.push({ label: 'Account Type', value: '401k', confidence: 'high', category: 'asset', rawMatch: '457 Plan' });
-  } else if (/tsp|thrift\s*savings/i.test(text)) {
-    fields.push({ label: 'Account Type', value: '401k', confidence: 'high', category: 'asset', rawMatch: 'Thrift Savings Plan' });
-  } else if (/brokerage/i.test(text)) {
-    fields.push({ label: 'Account Type', value: 'brokerage', confidence: 'high', category: 'asset', rawMatch: 'Brokerage Account' });
-  } else if (/529|education\s*(?:savings|plan)/i.test(text)) {
-    fields.push({ label: 'Account Type', value: 'brokerage', confidence: 'medium', category: 'asset', rawMatch: '529 Education Plan' });
+  // Fallback: "Ending Balance" with dollar on same line — pick the LAST non-zero dollar on that line
+  // (handles tables like "UC 457(b) Plan Total" where $0.00 $0.00 $23,130.80 $23,130.80)
+  if (accountValue === null || accountValue === 0) {
+    const endingBalLine = text.match(/ending\s*balance[^\n]*/i);
+    if (endingBalLine) {
+      const dollars = endingBalLine[0].match(/\$\s?([\d,]+(?:\.\d{2})?)/g);
+      if (dollars) {
+        // Pick the last non-zero value (usually the "Total" column)
+        for (let i = dollars.length - 1; i >= 0; i--) {
+          const val = parseDollar(dollars[i].replace(/\$/g, ''));
+          if (val > 0) { accountValue = val; break; }
+        }
+      }
+    }
   }
 
-  // Contributions
-  const contributions = extractDollarAfter(text, /(?:total\s*|employee\s*|employer\s*)?contributions?/i);
-  if (contributions !== null) {
-    fields.push({ label: 'Contributions', value: contributions, confidence: 'medium', category: 'income', rawMatch: `Contributions: $${contributions}` });
+  // Also try generic dollar-after-label
+  if (accountValue === null || accountValue === 0) {
+    accountValue = extractDollarAfter(text, /(?:account|portfolio|total|market|net\s*asset|net\s*account|current)\s*(?:value|balance|worth)/i);
   }
 
-  // Dividends
-  const divs = extractDollarAfter(text, /(?:total\s*)?dividends?\s*(?:received|earned|reinvested|paid|income)?/i);
-  if (divs !== null && divs > 0) {
-    fields.push({ label: 'Dividends', value: divs, confidence: 'medium', category: 'income', rawMatch: `Dividends: $${divs}` });
+  // Determine account type — check the first 500 chars (document header) first
+  // to avoid false positives from boilerplate (e.g., "Roth IRA" in SIPC disclaimers)
+  let accountTypeLabel = 'Investment Account';
+  const headerText = text.slice(0, 500);
+
+  if (/401\s*\(?k\)?/i.test(headerText)) {
+    accountTypeLabel = '401(k)';
+  } else if (/roth\s*(?:ira|individual\s*retirement)/i.test(headerText)) {
+    accountTypeLabel = 'Roth IRA';
+  } else if (/traditional\s*ira/i.test(headerText)) {
+    accountTypeLabel = 'Traditional IRA';
+  } else if (/457\s*\(?b?\)?/i.test(headerText)) {
+    accountTypeLabel = '457(b) Plan';
+  } else if (/403\s*\(?b\)?/i.test(headerText)) {
+    accountTypeLabel = '403(b)';
+  } else {
+    // Fall back to full text — check 401(k) first, Roth IRA last (often in boilerplate)
+    if (/401\s*\(?k\)?/i.test(text)) {
+      accountTypeLabel = '401(k)';
+    } else if (/457\s*\(?b?\)?/i.test(text) && /403\s*\(?b\)?/i.test(text)) {
+      // Combined UC statement — check contribution summary for the active plan
+      const contribSection = text.match(/contribution\s*summary[\s\S]{0,500}/i);
+      if (contribSection && /457\s*\(?b?\)?/i.test(contribSection[0])) {
+        accountTypeLabel = '457(b) Plan';
+      } else if (contribSection && /403\s*\(?b\)?/i.test(contribSection[0])) {
+        accountTypeLabel = '403(b)';
+      } else {
+        accountTypeLabel = 'Retirement Account';
+      }
+    } else if (/457\s*\(?b?\)?/i.test(text)) {
+      accountTypeLabel = '457(b) Plan';
+    } else if (/403\s*\(?b\)?/i.test(text)) {
+      accountTypeLabel = '403(b)';
+    } else if (/roth\s*(?:ira|individual\s*retirement)/i.test(text)) {
+      accountTypeLabel = 'Roth IRA';
+    } else if (/traditional\s*ira/i.test(text)) {
+      accountTypeLabel = 'Traditional IRA';
+    } else if (/tsp|thrift\s*savings/i.test(text)) {
+      accountTypeLabel = 'Thrift Savings Plan';
+    } else if (/529|education\s*(?:savings|plan)/i.test(text)) {
+      accountTypeLabel = '529 Plan';
+    } else if (/brokerage/i.test(text)) {
+      accountTypeLabel = 'Brokerage Account';
+    } else if (/retirement/i.test(text)) {
+      accountTypeLabel = 'Retirement Account';
+    }
   }
 
-  // Gain/Loss
-  const gains = extractDollarAfter(text, /(?:total\s*|net\s*|unrealized\s*|realized\s*)?(?:gain|loss|return)/i);
-  if (gains !== null) {
-    fields.push({ label: 'Investment Gain/Loss', value: gains, confidence: 'low', category: 'income', rawMatch: `Gain/Loss: $${gains}` });
+  if (accountValue !== null && accountValue > 0) {
+    fields.push({
+      label: `${accountTypeLabel} Balance`,
+      value: accountValue,
+      confidence: 'high',
+      category: 'asset',
+      rawMatch: `${accountTypeLabel}: $${accountValue.toLocaleString()}`,
+    });
+  }
+
+  // Beginning value for context
+  const beginPatterns = [
+    /beginning\s*account\s*value\s*\$\s?([\d,]+(?:\.\d{2})?)/i,
+    /beginning\s*balance\s*\$\s?([\d,]+(?:\.\d{2})?)/i,
+  ];
+  for (const pat of beginPatterns) {
+    const m = text.match(pat);
+    if (m) {
+      const val = parseDollar(m[1]);
+      if (val > 0) {
+        fields.push({ label: `${accountTypeLabel} Previous Balance`, value: val, confidence: 'medium', category: 'asset', rawMatch: `Beginning: $${val}` });
+        break;
+      }
+    }
+  }
+
+  // Employee/Employer Contributions
+  const empContrib = extractDollarAfter(text, /employee\s*contributions?/i);
+  if (empContrib !== null && empContrib > 0) {
+    fields.push({ label: 'Employee Contributions', value: empContrib, confidence: 'medium', category: 'asset', rawMatch: `Contributions: $${empContrib}` });
   }
 
   return fields;
 }
 
-// --- Pay Stub Extraction (Expanded) ---
+// --- Pay Stub Extraction ---
+// Handles UC/university pay stubs, ADP, Paychex, Gusto, etc.
 function extractPayStub(text: string): ExtractedField[] {
   const fields: ExtractedField[] = [];
 
-  const grossPay = extractDollarAfter(text, /gross\s*(?:pay|wages?|compensation|earnings)/i)
-    ?? extractLabeledAmount(text, /gross\s*(?:pay|wages?|compensation|earnings)/i);
-  if (grossPay !== null) {
-    fields.push({ label: 'Gross Pay (Period)', value: grossPay, confidence: 'high', category: 'income', rawMatch: `Gross Pay: $${grossPay}` });
+  // 1. Try to find Pay Rate (hourly) — more reliable for annual income estimation
+  const payRateMatch = text.match(/pay\s*rate\s*[:.]?\s*\$?\s?([\d,]+(?:\.\d+)?)\s*(?:hourly|\/\s*hr|per\s*hour)?/i);
+  const hourlyRate = payRateMatch ? parseFloat(payRateMatch[1]) : null;
+
+  // 2. Net Pay — look for "NET PAY" line with dollar amount
+  // UC format: "*TAXABLE TOT GRS ... NET PAY Current 5,733.60 ... YTD 22,371.79 ..."
+  // Or: "NET PAY Current X,XXX.XX"
+  // Or: "Net Pay $X,XXX.XX"
+  let netPayCurrent: number | null = null;
+  let netPayYTD: number | null = null;
+
+  // UC-specific: "NET PAY" section with "Current X,XXX.XX" and "YTD X,XXX.XX"
+  const netPaySection = text.match(/NET\s*PAY[\s\S]{0,200}?Current\s+([\d,]+\.\d{2})[\s\S]{0,100}?YTD\s+([\d,]+\.\d{2})/i);
+  if (netPaySection) {
+    netPayCurrent = parseDollar(netPaySection[1]);
+    netPayYTD = parseDollar(netPaySection[2]);
   }
 
-  const netPay = extractDollarAfter(text, /(?:net\s*pay|take[- ]?home\s*pay|net\s*(?:wages|amount|earnings))/i)
-    ?? extractLabeledAmount(text, /(?:net\s*pay|take[- ]?home)/i);
-  if (netPay !== null) {
-    fields.push({ label: 'Net Pay (Period)', value: netPay, confidence: 'high', category: 'income', rawMatch: `Net Pay: $${netPay}` });
+  // Generic net pay
+  if (netPayCurrent === null) {
+    // Try "Net Pay: $X,XXX.XX" format
+    const netPayMatch = text.match(/net\s*pay\s*[:.]?\s*\$?\s?([\d,]+\.\d{2})/i);
+    if (netPayMatch) netPayCurrent = parseDollar(netPayMatch[1]);
   }
 
-  const ytdGross = extractDollarAfter(text, /ytd\s*(?:gross|earnings|total|wages|compensation)/i)
-    ?? extractLabeledAmount(text, /ytd\s*(?:gross|earnings|total)/i);
-  if (ytdGross !== null) {
-    fields.push({ label: 'YTD Gross Earnings', value: ytdGross, confidence: 'high', category: 'income', rawMatch: `YTD Gross: $${ytdGross}` });
+  // 3. Gross Pay / Total Earnings
+  // UC format: "TOTAL: 80.00 5,733.60 312.15 22,371.79" (Hours Current YTDHours YTDEarnings)
+  // The TOTAL line in HOURS AND EARNINGS section
+  let grossPayCurrent: number | null = null;
+  let grossPayYTD: number | null = null;
+
+  // UC-specific: "*TAXABLE TOT GRS" line has current and YTD gross
+  const taxableTotMatch = text.match(/\*?TAXABLE\s+TOT\s+GRS[\s\S]{0,60}?Current\s+([\d,]+\.\d{2})[\s\S]{0,30}?YTD\s+([\d,]+\.\d{2})/i);
+  if (taxableTotMatch) {
+    grossPayCurrent = parseDollar(taxableTotMatch[1]);
+    grossPayYTD = parseDollar(taxableTotMatch[2]);
   }
 
-  const fedTax = extractDollarAfter(text, /federal\s*(?:income\s*)?(?:tax|withholding)|fed\s*(?:tax|w\/h)/i);
-  if (fedTax !== null) {
-    fields.push({ label: 'Federal Tax Withheld', value: fedTax, confidence: 'medium', category: 'tax', rawMatch: `Federal Tax: $${fedTax}` });
+  // Also try the HOURS AND EARNINGS TOTAL line
+  if (grossPayYTD === null) {
+    // Look for "TOTAL: <hours> <current$> <ytdHours> <ytd$>" pattern
+    const totalLineMatch = text.match(/TOTAL:\s+[\d.]+\s+([\d,]+\.\d{2})\s+[\d.]+\s+([\d,]+\.\d{2})/);
+    if (totalLineMatch) {
+      grossPayCurrent = parseDollar(totalLineMatch[1]);
+      grossPayYTD = parseDollar(totalLineMatch[2]);
+    }
   }
 
-  const stateTax = extractDollarAfter(text, /state\s*(?:income\s*)?(?:tax|withholding)/i);
-  if (stateTax !== null) {
-    fields.push({ label: 'State Tax Withheld', value: stateTax, confidence: 'medium', category: 'tax', rawMatch: `State Tax: $${stateTax}` });
+  // Generic gross pay
+  if (grossPayCurrent === null) {
+    grossPayCurrent = extractDollarAfter(text, /gross\s*(?:pay|wages?|compensation|earnings)/i);
   }
 
-  const retirement401k = extractDollarAfter(text, /401\s*\(?k\)?|retirement\s*(?:contribution|deduction)/i);
-  if (retirement401k !== null) {
-    fields.push({ label: '401(k) Contribution', value: retirement401k, confidence: 'medium', category: 'asset', rawMatch: `401(k): $${retirement401k}` });
+  // 4. Estimate annual salary
+  // Best: hourly rate × 2080 (standard full-time hours)
+  // Next: YTD gross extrapolated to full year
+  // Last: current period × pay frequency
+  let annualSalary: number | null = null;
+  if (hourlyRate && hourlyRate > 10 && hourlyRate < 1000) {
+    annualSalary = Math.round(hourlyRate * 2080);
+    fields.push({
+      label: 'Annual Salary (estimated)',
+      value: annualSalary,
+      confidence: 'high',
+      category: 'income',
+      rawMatch: `$${hourlyRate}/hr × 2080 hrs = $${annualSalary.toLocaleString()}`,
+    });
+  } else if (grossPayYTD && grossPayYTD > 1000) {
+    // Extrapolate YTD to annual — determine what fraction of year has passed
+    const dateMatch = text.match(/pay\s*end\s*date\s*[:.]?\s*(\d{1,2}\/\d{1,2}\/\d{4})/i);
+    if (dateMatch) {
+      const [mm] = dateMatch[1].split('/');
+      const monthFraction = parseInt(mm) / 12;
+      if (monthFraction > 0) {
+        annualSalary = Math.round(grossPayYTD / monthFraction);
+      }
+    }
+    if (!annualSalary) annualSalary = Math.round(grossPayYTD * 2); // rough estimate
+    fields.push({
+      label: 'Annual Salary (estimated from YTD)',
+      value: annualSalary,
+      confidence: 'medium',
+      category: 'income',
+      rawMatch: `YTD Gross: $${grossPayYTD.toLocaleString()}`,
+    });
   }
 
-  const healthIns = extractDollarAfter(text, /(?:health|medical|dental|vision)\s*(?:insurance|premium|deduction)/i);
-  if (healthIns !== null) {
-    fields.push({ label: 'Health Insurance Premium', value: healthIns, confidence: 'medium', category: 'expense', rawMatch: `Health Insurance: $${healthIns}` });
+  // 5. Net Pay per period (useful info)
+  if (netPayCurrent && netPayCurrent > 100) {
+    fields.push({
+      label: 'Net Pay (per period)',
+      value: netPayCurrent,
+      confidence: 'high',
+      category: 'income',
+      rawMatch: `Net Pay: $${netPayCurrent.toLocaleString()}`,
+    });
   }
 
-  // Pay frequency detection
-  if (/bi-?weekly|every\s*(?:two|2)\s*weeks|26\s*pay\s*periods/i.test(text)) {
-    fields.push({ label: 'Pay Frequency', value: 'biweekly', confidence: 'medium', category: 'personal', rawMatch: 'Bi-weekly pay' });
-  } else if (/semi-?monthly|twice\s*(?:a|per)\s*month|24\s*pay\s*periods/i.test(text)) {
-    fields.push({ label: 'Pay Frequency', value: 'semimonthly', confidence: 'medium', category: 'personal', rawMatch: 'Semi-monthly pay' });
-  } else if (/monthly|12\s*pay\s*periods/i.test(text)) {
-    fields.push({ label: 'Pay Frequency', value: 'monthly', confidence: 'medium', category: 'personal', rawMatch: 'Monthly pay' });
-  } else if (/weekly|52\s*pay\s*periods/i.test(text)) {
-    fields.push({ label: 'Pay Frequency', value: 'weekly', confidence: 'medium', category: 'personal', rawMatch: 'Weekly pay' });
+  // 6. Federal tax withheld
+  const fedWithMatch = text.match(/(?:fed(?:eral)?\s*(?:withholding|w\/h|income\s*tax))\s+([\d,]+\.\d{2})/i);
+  const fedTax = fedWithMatch ? parseDollar(fedWithMatch[1]) : extractDollarAfter(text, /fed(?:eral)?\s*withholding/i);
+  if (fedTax !== null && fedTax > 0) {
+    fields.push({ label: 'Federal Tax Withheld (period)', value: fedTax, confidence: 'medium', category: 'tax', rawMatch: `Federal Tax: $${fedTax}` });
+  }
+
+  // 7. Retirement contributions (from deductions)
+  const retirementMatch = text.match(/(?:457B?\s*Def\s*Comp|UC\s*Retirement|401\s*\(?k\)?|403\s*\(?b\)?|retirement)\s*(?:plan|contribution|deduction)?\s+([\d,]+\.\d{2})/i);
+  if (retirementMatch) {
+    const val = parseDollar(retirementMatch[1]);
+    if (val > 0) {
+      fields.push({ label: 'Retirement Contribution (period)', value: val, confidence: 'medium', category: 'asset', rawMatch: `Retirement: $${val}` });
+    }
+  }
+
+  // 8. Health insurance premium
+  const healthMatch = text.match(/(?:kaiser|aetna|cigna|blue\s*cross|united\s*health|health\s*(?:ins|premium))\s*(?:\w+\s+)?([\d,]+\.\d{2})/i);
+  if (healthMatch) {
+    const val = parseDollar(healthMatch[1]);
+    if (val > 0) {
+      fields.push({ label: 'Health Insurance (period)', value: val, confidence: 'medium', category: 'expense', rawMatch: `Health: $${val}` });
+    }
+  }
+
+  // 9. Job title
+  const jobMatch = text.match(/job\s*title\s*[:.]?\s*([A-Z][A-Za-z\s-]{2,30}?)(?:\s*pay|\s*$)/im);
+  if (jobMatch) {
+    fields.push({ label: 'Job Title', value: jobMatch[1].trim(), confidence: 'high', category: 'personal', rawMatch: jobMatch[0] });
+  }
+
+  // 10. Employer
+  const employerMatch = text.match(/(?:business\s*unit|employer)\s*[:.]?\s*([A-Z][A-Za-z\s-]{3,40}?)(?:\s*pay|\s*$)/im);
+  if (employerMatch) {
+    fields.push({ label: 'Employer', value: employerMatch[1].trim(), confidence: 'medium', category: 'personal', rawMatch: employerMatch[0] });
   }
 
   return fields;
@@ -479,23 +773,19 @@ export function extractFromText(text: string): { type: DocumentType; fields: Ext
     case 'investment': fields = extractInvestment(text); break;
     case 'pay_stub': fields = extractPayStub(text); break;
     case 'mortgage': fields = extractMortgage(text); break;
+    case 'budget': fields = extractBudgetItems(text); break;
     default: fields = []; break;
   }
 
-  // If we identified a type but got few results, also try generic extraction
-  if (fields.length < 3) {
-    const genericFields = extractGenericFinancialData(text);
-    // Only add generic fields that don't duplicate existing labels
-    const existingLabels = new Set(fields.map(f => f.label.toLowerCase()));
-    for (const gf of genericFields) {
-      if (!existingLabels.has(gf.label.toLowerCase())) {
-        fields.push(gf);
-      }
-    }
+  // If we identified a document type but the type-specific extractor found nothing,
+  // try generic extraction as a fallback. Don't pollute good type-specific results
+  // with noisy generic matches (e.g., "Rent/Lease $60k" from investment boilerplate).
+  if (type !== 'unknown' && fields.length === 0) {
+    fields = extractGenericFinancialData(text);
   }
 
   // If unknown, try all extractors and merge results
-  if (type === 'unknown' && fields.length === 0) {
+  if (type === 'unknown') {
     fields = [
       ...extractBankStatement(text),
       ...extractTaxReturn(text),
@@ -505,11 +795,11 @@ export function extractFromText(text: string): { type: DocumentType; fields: Ext
     ];
     // Lower confidence for all since we couldn't identify the document
     fields = fields.map(f => ({ ...f, confidence: 'low' as const }));
-  }
 
-  // If STILL empty, try the generic extractor as last resort
-  if (fields.length === 0) {
-    fields = extractGenericFinancialData(text);
+    // If STILL empty, try the generic extractor as last resort
+    if (fields.length === 0) {
+      fields = extractGenericFinancialData(text);
+    }
   }
 
   return { type, fields };

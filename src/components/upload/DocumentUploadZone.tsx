@@ -129,10 +129,10 @@ export default function DocumentUploadZone({ onProcessed }: DocumentUploadZonePr
               : s
           ));
         }
-      } catch {
+      } catch (err) {
         setFileStatuses(prev => prev.map(s =>
           s.name === file.name && s.status === 'processing'
-            ? { ...s, status: 'error', error: 'Processing failed' }
+            ? { ...s, status: 'error', error: err instanceof Error ? err.message : 'Processing failed' }
             : s
         ));
       }

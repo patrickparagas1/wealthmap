@@ -23,16 +23,14 @@ export async function extractTextFromPDF(file: File): Promise<PDFParseResult> {
   // Dynamic import to avoid SSR issues — pdfjs-dist requires browser APIs
   const pdfjsLib = await import('pdfjs-dist');
 
-  // Configure worker from CDN
-  pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+  // Use local worker file (CDN doesn't have v5.x builds)
+  pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 
   const arrayBuffer = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const metadata = await pdf.getMetadata().catch(() => null) as any;
   const pages: string[] = [];
 
+  // Extract text from each page first (metadata can hang with fake worker)
   for (let i = 1; i <= pdf.numPages; i++) {
     const page = await pdf.getPage(i);
     const textContent = await page.getTextContent();
@@ -42,6 +40,18 @@ export async function extractTextFromPDF(file: File): Promise<PDFParseResult> {
       .replace(/\s+/g, ' ')
       .trim();
     pages.push(pageText);
+  }
+
+  // Get metadata with timeout — getMetadata() can hang with fake worker
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let metadata: any = null;
+  try {
+    metadata = await Promise.race([
+      pdf.getMetadata(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 2000)),
+    ]);
+  } catch {
+    // Metadata is optional — ignore timeout or errors
   }
 
   return {
